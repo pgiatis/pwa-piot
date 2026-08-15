@@ -953,10 +953,6 @@ if (DEVICE_ID) {
   }
   histogramKey = `mypool-hist-${DEVICE_ID}`;
   loadHistogramPoints();
-  if (window.location.search) {
-    const cleanUrl = window.location.pathname + window.location.hash;
-    window.history.replaceState({}, '', cleanUrl);
-  }
 } else {
   loadHistogramPoints();
 }
@@ -1176,7 +1172,7 @@ setInterval(() => { sampleHistogram(false); }, HISTOGRAM_SAMPLE_MS);
 $('#btnUp').onclick=()=>{setTemp++;$('#valSet').textContent=setTemp.toFixed(1)+'°F';client?.publish(`${MAC}/control/set_temperature`,String(setTemp));};
 $('#btnDown').onclick=()=>{setTemp--;$('#valSet').textContent=setTemp.toFixed(1)+'°F';client?.publish(`${MAC}/control/set_temperature`,String(setTemp));};
 $('#valMode').onclick=()=>{modeState=(modeState+1)%4;$('#valMode').textContent=modeName(modeState);client?.publish(`${MAC}/control/set_mode`,String(modeState));};
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('service-worker-fixed.js').catch(()=>{});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('service-worker.js').catch(()=>{});});}
 </script>
 </body>
 </html>
