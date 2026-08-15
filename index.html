@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>MyPool.AI — Dashboard v4</title>
+<meta name="theme-color" content="#0b1220"/>
+<link rel="manifest" href="manifest_fixed.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<style>
+  :root{
+    --bg:#091427;
+    --panel:#0d1c34;
+    --card:#11223e;
+    --text:#e7edf7;
+    --muted:#9fb0c9;
+    --blue:#2b84ff;
+    --green:#2cd186;
+    --border:#1e2f4c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:linear-gradient(180deg,#0e2142 0%,var(--bg) 40%);min-height:100vh}
+  .app{max-width:1100px;margin:18px auto;padding:16px}
+  header{background:linear-gradient(145deg,#0f2347,#0b1a36);border:1px solid var(--border);border-radius:20px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .brand{display:flex;align-items:center;gap:12px}
+  h1{margin:0;font-weight:800;letter-spacing:.3px}
+  .status{display:flex;align-items:center;gap:10px}
+  .dot{width:11px;height:11px;border-radius:50%;background:#7a8699}
+  .panel{background:linear-gradient(145deg,var(--panel),#0a182f);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  @media(min-width:980px){.cards{grid-template-columns:repeat(3,1fr)}}
+  .card{background:linear-gradient(145deg,var(--card),#10203a);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;justify-content:center;position:relative}
+  .title{font-size:12px;color:var(--muted)}
+  .value{font-size:24px;font-weight:900;display:flex;align-items:center;gap:6px}
+  .value.blue{color:#67a5ff}
+  .flame{display:none;align-items:center;gap:6px;color:#ff8c00;font-weight:bold;animation:flamePulse 1.5s infinite ease-in-out;text-shadow:0 0 4px rgba(255,140,0,0.6);}
+  .flame span{font-size:13px;color:#ffb84d;font-weight:600}
+  @keyframes flamePulse{0%,100%{opacity:1;text-shadow:0 0 4px rgba(255,140,0,0.5);}50%{opacity:.85;text-shadow:0 0 12px rgba(255,140,0,0.9);}}
+  .setpoint{display:flex;align-items:center;justify-content:space-between;gap:4px}
+  .arrowbtn{background:#20345a;border:none;border-radius:50%;width:28px;height:28px;color:white;font-weight:bold;font-size:14px;cursor:pointer}
+  .arrowbtn:hover{background:#2b84ff}
+  .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .pill{border-radius:16px;border:1px solid var(--border);background:linear-gradient(145deg,#172b4f,#0d1f3f);color:var(--text);padding:18px 14px;text-align:center;cursor:pointer;font-weight:800;transition:background .2s}
+  .pill .small{display:block;margin-top:6px;font-size:12px;color:white;font-weight:600}
+  .pill.on{background:var(--green);color:white}
+  .schedule-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .histogram-panel{height:58vh;min-height:320px}
+  .histogram-panel canvas{width:100%;height:100%}
+  .footer{margin-top:12px;background:#0a162b;border:1px solid var(--border);border-radius:12px;padding:10px;color:#9fb0c9;font-size:12px}
+  .btn{appearance:none;border:1px solid #2b84ff55;background:linear-gradient(145deg,#18325f,#0f2347);color:#e7edf7;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:700}
+  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.72);z-index:2000;padding:14px}
+  .modal-card{width:min(920px,100%);max-height:90vh;overflow:auto;background:linear-gradient(145deg,#0f2347,#0b1830);border:1px solid var(--border);border-radius:18px;padding:16px;box-shadow:0 25px 80px rgba(0,0,0,.35)}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .modal-title{font-size:18px;font-weight:900}
+  .modal-close{border:none;background:#20345a;color:var(--text);border-radius:10px;width:36px;height:36px;cursor:pointer;font-size:18px}
+  .modal-body{display:grid;gap:12px}
+  .modal-actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .schedule-list{display:grid;gap:10px}
+  .schedule-item{border:1px solid var(--border);background:rgba(255,255,255,.03);border-radius:14px;padding:12px;display:flex;justify-content:space-between;gap:10px}
+  .schedule-item .meta{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+  .schedule-item .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .editor{border:1px solid var(--border);background:rgba(0,0,0,.18);border-radius:14px;padding:12px}
+  .editor.hidden{display:none}
+  .field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .field{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+  .field input[type="number"],.field input[type="time"],.field select{padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:#0e1a31;color:var(--text)}
+  .day-row{display:flex;flex-wrap:wrap;gap:10px}
+  .day-chip{display:inline-flex;align-items:center;gap:6px;background:#0e1a31;border:1px solid var(--border);padding:8px 10px;border-radius:999px;font-size:12px}
+  .state-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .state-row{display:flex;flex-direction:column;gap:6px}
+  .state-label{font-size:12px;color:var(--muted)}
+  .state-btn{border:none;border-radius:12px;padding:10px 8px;color:#fff;font-weight:800;cursor:pointer}
+  .state-btn.on{background:var(--green)}
+  .state-btn.off{background:#ff6b6b}
+  .state-btn.dc{background:#5e6d88}
+  .empty-state{color:var(--muted);font-size:13px;padding:8px 2px}
+  .install-help{font-size:14px;line-height:1.5;color:var(--text)}
+  .install-help ol{margin:8px 0 0 20px;padding:0}
+  .hist-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .hist-controls label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .hist-controls .group-title{font-size:12px;color:var(--muted);font-weight:700;margin-left:4px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><h1>MyPool.AI</h1></div>
+    <div class="status"><span class="dot" id="dot"></span></div>
+  </header>
+
+  <div class="panel">
+    <div class="cards">
+      <div class="card" id="card-water"><div class="title">WATER TEMPERATURE</div><div class="value" id="valWater">—<div class="flame" id="flame"><div>🔥</div><span>Heating</span></div></div></div>
+      <div class="card" id="card-set"><div class="title">SET POINT</div><div class="setpoint"><div class="value blue" id="valSet">—</div><div><button class="arrowbtn" id="btnUp">▲</button><button class="arrowbtn" id="btnDown">▼</button></div></div></div>
+      <div class="card" id="card-air"><div class="title">AMBIENT AIR</div><div class="value" id="valAir">—</div></div>
+      <div class="card" id="card-ctrl"><div class="title">CONTROLLER TEMP</div><div class="value" id="valCtrl">—</div></div>
+      <div class="card" id="card-lux"><div class="title">LIGHT LEVEL</div><div class="value" id="valLux">—</div></div>
+      <div class="card" id="card-mode"><div class="title">CURRENT MODE</div><div class="value" id="valMode" style="cursor:pointer;text-decoration:underline">—</div></div>
+    </div>
+
+    <div style="margin:14px 0 8px;color:#9fb0c9;font-weight:700;">Circuits</div>
+    <div class="controls" id="controls"></div>
+
+      <div class="schedule-tools">
+        <button id="btnScheduleOpen" class="btn">View / Edit Schedule</button>
+        <button id="btnHeaterScheduleOpen" class="btn">Heater Schedule Settings</button>
+        <button id="btnScheduleLogsOpen" class="btn">Schedule Event Logs</button>
+        <button id="btnHistogramOpen" class="btn">Histogram</button>
+        <button id="btnInstallApp" class="btn">Add To Phone Home Screen</button>
+      </div>
+
+  </div>
+
+  <div class="footer" id="foot">Disconnected</div>
+</div>
+
+  <div class="modal" id="schedule-modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">Schedule Editor</div>
+        <button class="modal-close" id="schedule-modal-close" type="button">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="schedule-editor" class="editor hidden"></div>
+        <div class="modal-actions">
+          <button id="schedule-add-btn" class="btn">Add Entry</button>
+          <button id="schedule-refresh-btn" class="btn">Refresh</button>
+        </div>
+        <div id="schedule-list" class="schedule-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="heater-schedule-modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">Heater Schedule Settings</div>
+        <button class="modal-close" id="heater-schedule-modal-close" type="button">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="heater-schedule-editor" class="editor hidden"></div>
+        <div class="modal-actions">
+          <button id="heater-schedule-add-btn" class="btn">Add Entry</button>
+          <button id="heater-schedule-refresh-btn" class="btn">Refresh</button>
+        </div>
+        <div id="heater-schedule-list" class="schedule-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="histogram-modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">Histogram (Last 24 Hours)</div>
+        <button class="modal-close" id="histogram-modal-close" type="button">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-actions">
+          <button id="histogram-refresh-btn" class="btn">Refresh</button>
+          <div class="hist-controls">
+            <label><input type="checkbox" id="hist-all-on"> All On</label>
+            <label><input type="checkbox" id="hist-all-off"> All Off</label>
+            <span class="group-title">Refresh:</span>
+            <label><input type="checkbox" id="hist-int-5s"> 5 Seconds</label>
+            <label><input type="checkbox" id="hist-int-10s"> 10 Seconds</label>
+            <label><input type="checkbox" id="hist-int-30s"> 30 Seconds</label>
+            <label><input type="checkbox" id="hist-int-60s"> 1 Minute</label>
+          </div>
+        </div>
+        <div class="histogram-panel">
+          <canvas id="histogram-chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="schedule-log-modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">Scheduled Mode Event Logs (Last 24 Hours)</div>
+        <button class="modal-close" id="schedule-log-modal-close" type="button">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="schedule-log-list" class="schedule-list"></div>
+        <div class="modal-actions">
+          <button id="schedule-log-refresh-btn" class="btn">Refresh</button>
+          <button id="schedule-log-clear-btn" class="btn">Clear Logs</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="install-help-modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">Add MyPool.AI To Home Screen</div>
+        <button class="modal-close" id="install-help-modal-close" type="button">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="install-help-text" class="install-help"></div>
+      </div>
+    </div>
+  </div>
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const dot=$('#dot');const foot=$('#foot');const controlsEl=$('#controls');const flame=$('#flame');
+function setDot(c){dot.style.background=c;}function setFoot(m){foot.textContent=m;}
+function formatF(v){if(v==null||v==='')return'—';const n=Number(v);if(Number.isFinite(n))return n.toFixed(1)+'°F';return String(v);}
+function formatLux(v){const n=Number(v);return Number.isFinite(n)?n.toFixed(0)+' lx':'—';}
+function formatW(v){const n=Number(v);return Number.isFinite(n)?n.toFixed(1)+' W':'0.0 W';}
+function escapeHtml(value){return String(value ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}
+
+const DAY_BITS=[1,2,4,8,16,32,64];
+const DAY_LABELS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let scheduleEditorActions=[0,0,0,0];
+let heaterScheduleEditorOpen=false;
+let histogramChart=null;
+let histogramPoints=[];
+let lastHistogramSampleMs=0;
+let histogramKey='mypool-hist';
+const HISTOGRAM_WINDOW_MS=24*60*60*1000;
+const HISTOGRAM_SAMPLE_MS=60*1000;
+const HISTOGRAM_REFRESH_MS=30*1000;
+let histogramRefreshMs=HISTOGRAM_REFRESH_MS;
+let histogramRefreshTimer=null;
+let histogramModalOpen=false;
+let pendingHistogramEvents=[];
+let lastKnownUptimeSec=null;
+let hasConnectedOnce=false;
+let deferredInstallPrompt=null;
+let latestTelemetry={
+  power:[null,null,null,null],
+  state:[null,null,null,null],
+  water:null,
+  air:null,
+  ctrl:null,
+  lux:null,
+  heater:null,
+  uptimeSec:null
+};
+
+function histogramAlias(index1to4){
+  return (circuitAliases.get(index1to4) || circuitAliases.get(index1to4 - 1) || `Circuit ${index1to4}`);
+}
+
+function histogramAliasGroups(){
+  const groups = [];
+  const byKey = new Map();
+  for (let i = 1; i <= 4; i++) {
+    const raw = String(histogramAlias(i) || '').trim();
+    const label = raw || `Circuit ${i}`;
+    const key = label.toLowerCase();
+    if (!byKey.has(key)) {
+      byKey.set(key, { label, indices: [] });
+      groups.push(byKey.get(key));
+    }
+    byKey.get(key).indices.push(i);
+  }
+  return groups;
+}
+function addHistogramEvent(label){
+  if (!label) return;
+  pendingHistogramEvents.push(label);
+  sampleHistogram(true);
+}
+
+function toBinaryState(value){
+  const n = Number(value);
+  return Number.isFinite(n) ? (n > 0 ? 1 : 0) : null;
+}
+
+function historyNowMs(){ return Date.now(); }
+function trimHistogramPoints(){
+  const cutoff = historyNowMs() - HISTOGRAM_WINDOW_MS;
+  histogramPoints = histogramPoints.filter(p => p.ts >= cutoff);
+  if (histogramPoints.length > 1445) {
+    histogramPoints = histogramPoints.slice(histogramPoints.length - 1445);
+  }
+}
+function loadHistogramPoints(){
+  try {
+    const raw = localStorage.getItem(histogramKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      histogramPoints = parsed;
+      trimHistogramPoints();
+    }
+  } catch (_) {}
+}
+function saveHistogramPoints(){
+  try { localStorage.setItem(histogramKey, JSON.stringify(histogramPoints)); } catch (_) {}
+}
+function toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : null; }
+function sampleHistogram(force=false){
+  const now = historyNowMs();
+  if (!force && (now - lastHistogramSampleMs) < HISTOGRAM_SAMPLE_MS) return;
+  lastHistogramSampleMs = now;
+  const evt = pendingHistogramEvents.length ? pendingHistogramEvents.join(' | ') : null;
+  pendingHistogramEvents = [];
+  histogramPoints.push({
+    ts: now,
+    p1: toNum(latestTelemetry.power[0]),
+    p2: toNum(latestTelemetry.power[1]),
+    p3: toNum(latestTelemetry.power[2]),
+    p4: toNum(latestTelemetry.power[3]),
+    s1: toNum(latestTelemetry.state[0]),
+    s2: toNum(latestTelemetry.state[1]),
+    s3: toNum(latestTelemetry.state[2]),
+    s4: toNum(latestTelemetry.state[3]),
+    water: toNum(latestTelemetry.water),
+    air: toNum(latestTelemetry.air),
+    ctrl: toNum(latestTelemetry.ctrl),
+    lux: toNum(latestTelemetry.lux),
+    heater: toNum(latestTelemetry.heater),
+    evt: evt
+  });
+  trimHistogramPoints();
+  if (histogramPoints.length % 5 === 0 || force) saveHistogramPoints();
+}
+function histogramLabels(points){
+  return points.map(p => {
+    const d = new Date(p.ts);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  });
+}
+function ensureHistogramChart(){
+  const canvas = document.getElementById('histogram-chart');
+  if (!canvas || !window.Chart) return null;
+  if (histogramChart) return histogramChart;
+  histogramChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#dbe7ff', usePointStyle: true, pointStyle: 'rect' } },
+        title: { display: false },
+        tooltip: {
+          callbacks: {
+            afterLabel: (ctx) => {
+              const row = histogramPoints[ctx.dataIndex];
+              if (row && row.evt) return `Event: ${row.evt}`;
+              return '';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#9fb0c9', maxTicksLimit: 12 }, grid: { color: 'rgba(159,176,201,0.18)' } },
+        yPower: { type: 'linear', position: 'left', title: { display: true, text: 'Power (W)', color: '#90caf9' }, ticks: { color: '#90caf9' }, grid: { color: 'rgba(159,176,201,0.18)' } },
+        yTemp: { type: 'linear', position: 'right', title: { display: true, text: 'Temp (F)', color: '#ffcc80' }, ticks: { color: '#ffcc80' }, grid: { drawOnChartArea: false } },
+        yLux: { type: 'linear', position: 'right', offset: true, title: { display: true, text: 'Lux', color: '#c5e1a5' }, ticks: { color: '#c5e1a5' }, grid: { drawOnChartArea: false } },
+        yState: { type: 'linear', position: 'left', offset: true, min: -0.2, max: 1.3, title: { display: true, text: 'State (On/Off)', color: '#ef9a9a' }, ticks: { color: '#ef9a9a', stepSize: 1, callback: (value) => (Number(value) === 0 ? 'Off' : (Number(value) === 1 ? 'On' : '')) }, grid: { drawOnChartArea: false } },
+        yHeater: { type: 'linear', position: 'left', offset: true, min: -0.2, max: 1.3, display: false }
+      }
+    }
+  });
+  return histogramChart;
+}
+
+async function fetchUptimeAndDetectReboot(){
+  try {
+    const resp = await fetch('/api/sysinfo');
+    if (!resp.ok) return;
+    const info = await resp.json();
+    const up = Number(info.uptime_sec);
+    if (!Number.isFinite(up)) return;
+    latestTelemetry.uptimeSec = up;
+    if (lastKnownUptimeSec !== null && up + 5 < lastKnownUptimeSec) {
+      addHistogramEvent('Reboot');
+    }
+    lastKnownUptimeSec = up;
+  } catch (_) {}
+}
+
+function renderHistogram(){
+  sampleHistogram(true);
+  const chart = ensureHistogramChart();
+  if (!chart) return;
+  const points = histogramPoints.slice();
+  const labels = histogramLabels(points);
+  const ds = (data, label, color, axis, stepped=false) => ({ label, data, borderColor: color, backgroundColor: color, pointRadius: 0, borderWidth: 1.7, tension: 0.22, yAxisID: axis, spanGaps: true, stepped, pointStyle: 'rect' });
+  const groups = histogramAliasGroups();
+  const powerPalette = ['#4fc3f7', '#29b6f6', '#03a9f4', '#0288d1'];
+  const statePalette = ['#81d4fa', '#4dd0e1', '#26c6da', '#00bcd4'];
+  const groupedPower = groups.map((g) => {
+    return points.map((p) => {
+      let sum = 0;
+      let hasAny = false;
+      for (const idx of g.indices) {
+        const v = toNum(p[`p${idx}`]);
+        if (v !== null) {
+          sum += v;
+          hasAny = true;
+        }
+      }
+      return hasAny ? sum : null;
+    });
+  });
+  const groupedState = groups.map((g) => {
+    return points.map((p) => {
+      let maxState = null;
+      for (const idx of g.indices) {
+        const v = toBinaryState(p[`s${idx}`]);
+        if (v !== null) {
+          maxState = (maxState === null) ? v : Math.max(maxState, v);
+        }
+      }
+      return maxState;
+    });
+  });
+  const eventData = points.map(p => p.evt ? 1.2 : null);
+  const datasets = [];
+  for (let i = 0; i < groups.length; i++) {
+    datasets.push(ds(groupedPower[i], `${groups[i].label} W`, powerPalette[i % powerPalette.length], 'yPower'));
+  }
+  for (let i = 0; i < groups.length; i++) {
+    datasets.push(ds(groupedState[i], `${groups[i].label} On/Off`, statePalette[i % statePalette.length], 'yState', true));
+  }
+  chart.data.labels = labels;
+  datasets.push(ds(points.map(p => p.water), 'Water Temp', '#ffb74d', 'yTemp'));
+  datasets.push(ds(points.map(p => p.air), 'Ambient Air', '#81c784', 'yTemp'));
+  datasets.push(ds(points.map(p => p.ctrl), 'Controller Temp', '#ba68c8', 'yTemp'));
+  datasets.push(ds(points.map(p => p.lux), 'Light Level', '#cddc39', 'yLux'));
+  datasets.push(ds(points.map(p => toBinaryState(p.heater)), 'Heater On/Off', '#ef5350', 'yState', true));
+  datasets.push({ label: 'Restart', data: eventData, type: 'line', stepped: true, showLine: false, pointRadius: 4, pointHoverRadius: 5, pointStyle: 'rect', borderWidth: 0, borderColor: '#ffffff', backgroundColor: '#ffffff', yAxisID: 'yState', spanGaps: true });
+  chart.data.datasets = datasets;
+  chart.update('none');
+  syncHistogramVisibilityCheckboxes();
+}
+
+function syncHistogramVisibilityCheckboxes(){
+  const allOn = document.getElementById('hist-all-on');
+  const allOff = document.getElementById('hist-all-off');
+  if (!allOn || !allOff || !histogramChart) return;
+  const target = histogramChart.data.datasets.filter(ds => ds.label !== 'Restart');
+  const allVisible = target.length > 0 && target.every(ds => ds.hidden !== true);
+  const anyVisible = target.some(ds => ds.hidden !== true);
+  allOn.checked = allVisible;
+  allOff.checked = !anyVisible;
+}
+
+function setAllHistogramDatasetsVisible(visible){
+  const chart = ensureHistogramChart();
+  if (!chart) return;
+  chart.data.datasets.forEach(ds => {
+    if (ds.label === 'Restart') return;
+    ds.hidden = !visible;
+  });
+  chart.update('none');
+  syncHistogramVisibilityCheckboxes();
+}
+
+function syncHistogramIntervalCheckboxes(){
+  const byId = {
+    'hist-int-5s': 5000,
+    'hist-int-10s': 10000,
+    'hist-int-30s': 30000,
+    'hist-int-60s': 60000
+  };
+  Object.keys(byId).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = (histogramRefreshMs === byId[id]);
+  });
+}
+
+function setHistogramRefreshInterval(ms){
+  histogramRefreshMs = ms;
+  if (histogramRefreshTimer) {
+    clearInterval(histogramRefreshTimer);
+  }
+  histogramRefreshTimer = setInterval(() => {
+    if (histogramModalOpen && document.visibilityState === 'visible') {
+      fetchUptimeAndDetectReboot().finally(() => renderHistogram());
+    }
+  }, histogramRefreshMs);
+  syncHistogramIntervalCheckboxes();
+}
+
+function bindHistogramControls(){
+  const allOn = document.getElementById('hist-all-on');
+  const allOff = document.getElementById('hist-all-off');
+  if (allOn) {
+    allOn.addEventListener('change', () => {
+      if (allOn.checked) setAllHistogramDatasetsVisible(true);
+      else syncHistogramVisibilityCheckboxes();
+    });
+  }
+  if (allOff) {
+    allOff.addEventListener('change', () => {
+      if (allOff.checked) setAllHistogramDatasetsVisible(false);
+      else syncHistogramVisibilityCheckboxes();
+    });
+  }
+
+  const intervalMap = [
+    ['hist-int-5s', 5000],
+    ['hist-int-10s', 10000],
+    ['hist-int-30s', 30000],
+    ['hist-int-60s', 60000]
+  ];
+  intervalMap.forEach(([id, ms]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', () => {
+      if (el.checked) setHistogramRefreshInterval(ms);
+      else syncHistogramIntervalCheckboxes();
+    });
+  });
+  syncHistogramIntervalCheckboxes();
+}
+function showHistogramModal(){ histogramModalOpen=true; openModal('histogram-modal'); fetchUptimeAndDetectReboot().finally(() => renderHistogram()); }
+function hideHistogramModal(){ histogramModalOpen=false; closeModal('histogram-modal'); }
+function showScheduleLogModal(){ openModal('schedule-log-modal'); refreshScheduleLogs(); }
+function hideScheduleLogModal(){ closeModal('schedule-log-modal'); }
+
+function openModal(id){document.getElementById(id).style.display='flex';}
+function closeModal(id){document.getElementById(id).style.display='none';}
+function dayMaskToText(mask){
+  const names=[];
+  DAY_BITS.forEach((bit, idx)=>{ if(mask & bit) names.push(DAY_LABELS[idx]); });
+  return names.length ? names.join(', ') : 'None';
+}
+function renderDayCheckboxes(mask, prefix){
+  return DAY_BITS.map((bit, idx)=>`<label class="day-chip"><input type="checkbox" data-bit="${bit}" ${mask & bit ? 'checked' : ''}> ${DAY_LABELS[idx]}</label>`).join('');
+}
+function getCheckedDayMask(containerId){
+  const container=document.getElementById(containerId);
+  let mask=0;
+  container.querySelectorAll('input[type="checkbox"][data-bit]').forEach(cb=>{ if(cb.checked) mask |= Number(cb.dataset.bit); });
+  return mask;
+}
+function setScheduleButtons(containerId, actions, onChange){
+  const container=document.getElementById(containerId);
+  container.innerHTML='';
+  actions.forEach((value, index)=>{
+    const row=document.createElement('div');
+    row.className='state-row';
+    const label=document.createElement('div');
+    label.className='state-label';
+    label.textContent=`${getCircuitLabel(index)}`;
+    const button=document.createElement('button');
+    button.type='button';
+    button.className='state-btn ' + (value===1 ? 'on' : value===2 ? 'off' : 'dc');
+    button.textContent=value===1 ? 'ON' : value===2 ? 'OFF' : 'DC';
+    button.addEventListener('click', ()=>{
+      const next = value === 0 ? 1 : value === 1 ? 2 : 0;
+      actions[index] = next;
+      button.className='state-btn ' + (next===1 ? 'on' : next===2 ? 'off' : 'dc');
+      button.textContent=next===1 ? 'ON' : next===2 ? 'OFF' : 'DC';
+      if (onChange) onChange(actions);
+    });
+    row.appendChild(label);
+    row.appendChild(button);
+    container.appendChild(row);
+  });
+}
+function getCircuitLabel(index){
+  const label = circuitAliases.get(index) || circuitAliases.get(index + 1);
+  return label ? label : `Circuit ${index + 1}`;
+}
+function renderCircuitSummary(actions){
+  const parts=[];
+  actions.forEach((action, index)=>{
+    if (action === 0) return;
+    const label = circuitAliases.get(index) || `Circuit ${index + 1}`;
+    parts.push(`${label}: ${action === 1 ? 'ON' : 'OFF'}`);
+  });
+  return parts.length ? parts.join(', ') : 'All circuits DC';
+}
+function showScheduleModal(){openModal('schedule-modal'); refreshSchedule();}
+function hideScheduleModal(){closeModal('schedule-modal'); hideScheduleEditor();}
+function showHeaterScheduleModal(){openModal('heater-schedule-modal'); refreshHeaterSchedule();}
+function hideHeaterScheduleModal(){closeModal('heater-schedule-modal'); hideHeaterScheduleEditor();}
+
+function refreshScheduleLogs(){
+  const logList = document.getElementById('schedule-log-list');
+  if (!logList) return;
+  logList.innerHTML = '<div class="empty-state">Loading logs...</div>';
+  fetch('/api/schedule/logs')
+    .then(response => response.json())
+    .then(logs => {
+      if (!Array.isArray(logs) || logs.length === 0) {
+        logList.innerHTML = '<div class="empty-state">No scheduled mode events in the last 24 hours.</div>';
+        return;
+      }
+      logList.innerHTML = logs.map((log, idx) => `
+        <div class="schedule-item">
+          <div>
+            <div style="font-weight:800;color:var(--text);">${idx + 1}. ${escapeHtml(log.time_str || 'Unknown time')}</div>
+            <div class="meta">${escapeHtml(log.changes || 'No details')}</div>
+          </div>
+        </div>
+      `).join('');
+      logList.scrollTop = 0;
+    })
+    .catch(error => {
+      console.error('Error loading schedule logs:', error);
+      logList.innerHTML = '<div class="empty-state">Error loading schedule logs.</div>';
+    });
+}
+
+function clearScheduleLogs(){
+  if (!confirm('Clear all schedule event logs? This cannot be undone.')) return;
+  fetch('/api/schedule/logs/clear')
+    .then(response => {
+      if (!response.ok) throw new Error('Clear logs failed');
+      refreshScheduleLogs();
+    })
+    .catch(error => {
+      console.error('Error clearing schedule logs:', error);
+      alert('Failed to clear schedule logs');
+    });
+}
+
+function isIosDevice(){
+  const ua = navigator.userAgent || '';
+  return /iPhone|iPad|iPod/i.test(ua);
+}
+
+function isStandaloneDisplay(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function updateInstallButton(){
+  const btn = document.getElementById('btnInstallApp');
+  if (!btn) return;
+  if (isStandaloneDisplay()) {
+    btn.disabled = true;
+    btn.style.opacity = '0.65';
+    btn.textContent = 'MyPool.AI Installed';
+    return;
+  }
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.textContent = deferredInstallPrompt ? 'Add To Phone Home Screen' : 'Install Help';
+}
+
+function openInstallHelpModal(){
+  const help = document.getElementById('install-help-text');
+  if (!help) return;
+  const ios = isIosDevice();
+  help.innerHTML = ios
+    ? 'Install MyPool.AI on iPhone:<ol><li>Tap the Share button in Safari.</li><li>Select <b>Add to Home Screen</b>.</li><li>Confirm the app name as <b>MyPool.AI</b> and tap Add.</li></ol>'
+    : 'Install MyPool.AI on Android/Chrome:<ol><li>Tap the browser menu (three dots).</li><li>Select <b>Install app</b> or <b>Add to Home Screen</b>.</li><li>Confirm the app name as <b>MyPool.AI</b>.</li></ol>';
+  openModal('install-help-modal');
+}
+
+async function installApp(){
+  if (isStandaloneDisplay()) {
+    alert('MyPool.AI is already installed on this phone.');
+    return;
+  }
+  if (deferredInstallPrompt) {
+    const promptEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    promptEvent.prompt();
+    try { await promptEvent.userChoice; } catch (_) {}
+    updateInstallButton();
+    return;
+  }
+  openInstallHelpModal();
+}
+function hideScheduleEditor(){
+  const editor = document.getElementById('schedule-editor');
+  const list = document.getElementById('schedule-list');
+  editor.classList.add('hidden');
+  editor.innerHTML='';
+  list.hidden = false;
+}
+function hideHeaterScheduleEditor(){
+  const editor = document.getElementById('heater-schedule-editor');
+  const list = document.getElementById('heater-schedule-list');
+  editor.classList.add('hidden');
+  editor.innerHTML='';
+  list.hidden = false;
+  heaterScheduleEditorOpen=false;
+}
+function scheduleEditorHtml(entry){
+  const days = entry?.days ?? entry?.day ?? 0;
+  const hour = entry?.start_hour ?? entry?.hour ?? 17;
+  const minute = entry?.start_minute ?? entry?.minute ?? 0;
+  const actions = Array.isArray(entry?.actions) ? entry.actions.slice(0,4) : [0,0,0,0];
+  scheduleEditorActions = actions.length === 4 ? actions : [0,0,0,0];
+  const title = entry ? 'Edit Schedule Entry' : 'Add Schedule Entry';
+  return `
+    <div class="field-grid">
+      <div class="field" style="grid-column:1/-1;">
+        <div>${title}</div>
+      </div>
+      <div class="field" style="grid-column:1/-1;">
+        <div>Days</div>
+        <div class="day-row" id="schedule-day-row">${renderDayCheckboxes(days)}</div>
+      </div>
+      <div class="field">
+        <div>Start Hour</div>
+        <select id="schedule-hour">${Array.from({length:24}, (_, i)=>`<option value="${i}" ${i===Number(hour) ? 'selected' : ''}>${String(i).padStart(2,'0')}</option>`).join('')}</select>
+      </div>
+      <div class="field">
+        <div>Start Minute</div>
+        <select id="schedule-minute">${Array.from({length:60}, (_, i)=>`<option value="${i}" ${i===Number(minute) ? 'selected' : ''}>${String(i).padStart(2,'0')}</option>`).join('')}</select>
+      </div>
+      <div class="field" style="grid-column:1/-1;">
+        <div>Circuits</div>
+        <div class="state-grid" id="schedule-state-buttons"></div>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:12px;">
+      <button id="schedule-cancel-btn" class="btn" type="button">Cancel</button>
+      <button id="schedule-save-btn" class="btn" type="button">Save</button>
+    </div>
+  `;
+}
+function heaterEditorHtml(entry){
+  const days = entry?.days ?? entry?.day ?? 0;
+  const targetHour = entry?.target_hour ?? 17;
+  const targetMinute = entry?.target_minute ?? 0;
+  const stopHour = entry?.stop_hour ?? 19;
+  const stopMinute = entry?.stop_minute ?? 0;
+  const targetTemp = entry?.target_temp ?? 82;
+  const title = entry ? 'Edit Heater Schedule Entry' : 'Add Heater Schedule Entry';
+  return `
+    <div class="field-grid">
+      <div class="field" style="grid-column:1/-1;">
+        <div>${title}</div>
+      </div>
+      <div class="field" style="grid-column:1/-1;">
+        <div>Days</div>
+        <div class="day-row" id="heater-day-row">${renderDayCheckboxes(days)}</div>
+      </div>
+      <div class="field">
+        <div>Target Temp (F)</div>
+        <input id="heater-target-temp" type="number" min="60" max="110" step="0.5" value="${escapeHtml(targetTemp)}">
+      </div>
+      <div class="field">
+        <div>Ready By</div>
+        <input id="heater-ready-time" type="time" value="${String(targetHour).padStart(2,'0')}:${String(targetMinute).padStart(2,'0')}">
+      </div>
+      <div class="field">
+        <div>Hold Until</div>
+        <input id="heater-stop-time" type="time" value="${String(stopHour).padStart(2,'0')}:${String(stopMinute).padStart(2,'0')}">
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:12px;">
+      <button id="heater-cancel-btn" class="btn" type="button">Cancel</button>
+      <button id="heater-save-btn" class="btn" type="button">Save</button>
+    </div>
+  `;
+}
+function openScheduleEditor(entry){
+  const editor = document.getElementById('schedule-editor');
+  const list = document.getElementById('schedule-list');
+  list.hidden = true;
+  editor.classList.remove('hidden');
+  editor.innerHTML = scheduleEditorHtml(entry);
+  setScheduleButtons('schedule-state-buttons', scheduleEditorActions, ()=>{});
+  editor.querySelectorAll('input[type="checkbox"][data-bit]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{});
+  });
+  document.getElementById('schedule-cancel-btn').onclick = hideScheduleEditor;
+  document.getElementById('schedule-save-btn').onclick = () => submitScheduleEntry(entry?.index);
+}
+function openHeaterScheduleEditor(entry){
+  const editor = document.getElementById('heater-schedule-editor');
+  const list = document.getElementById('heater-schedule-list');
+  list.hidden = true;
+  editor.classList.remove('hidden');
+  editor.innerHTML = heaterEditorHtml(entry);
+  heaterScheduleEditorOpen=true;
+  document.getElementById('heater-cancel-btn').onclick = hideHeaterScheduleEditor;
+  document.getElementById('heater-save-btn').onclick = () => submitHeaterScheduleEntry(entry?.index);
+}
+function submitScheduleEntry(index){
+  const days = getCheckedDayMask('schedule-day-row');
+  const hour = Number(document.getElementById('schedule-hour').value);
+  const minute = Number(document.getElementById('schedule-minute').value);
+  const actions = scheduleEditorActions.slice(0,4);
+  if(!days){ alert('Please select at least one day'); return; }
+  if(!actions.some(v => v !== 0)){ alert('Please set at least one circuit state'); return; }
+  const payload = { days, start_hour: hour, start_minute: minute, actions };
+  if (Number.isInteger(index)) payload.index = index;
+  fetch(index !== undefined && index !== null ? '/api/schedule/update' : '/api/schedule/add', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  }).then(response => {
+    if (!response.ok) throw new Error('Schedule save failed');
+    hideScheduleEditor();
+    refreshSchedule();
+  }).catch(error => {
+    console.error('Error saving schedule entry:', error);
+    alert('Failed to save schedule entry');
+  });
+}
+function submitHeaterScheduleEntry(index){
+  const days = getCheckedDayMask('heater-day-row');
+  const targetTemp = Number(document.getElementById('heater-target-temp').value);
+  const ready = document.getElementById('heater-ready-time').value || '17:00';
+  const stop = document.getElementById('heater-stop-time').value || '19:00';
+  const [targetHour, targetMinute] = ready.split(':').map(v => Number(v));
+  const [stopHour, stopMinute] = stop.split(':').map(v => Number(v));
+  if(!days){ alert('Please select at least one day'); return; }
+  if(!Number.isFinite(targetTemp) || targetTemp < 60 || targetTemp > 110){ alert('Target temp must be 60-110F'); return; }
+  const targetTotal = targetHour * 60 + targetMinute;
+  const stopTotal = stopHour * 60 + stopMinute;
+  if(!Number.isInteger(targetHour) || !Number.isInteger(targetMinute) || !Number.isInteger(stopHour) || !Number.isInteger(stopMinute)) { alert('Invalid time values'); return; }
+  if(stopTotal <= targetTotal){ alert('Hold Until must be after Ready By'); return; }
+  const payload = { days, target_temp: targetTemp, target_hour: targetHour, target_minute: targetMinute, stop_hour: stopHour, stop_minute: stopMinute };
+  if (Number.isInteger(index)) payload.index = index;
+  fetch(index !== undefined && index !== null ? '/api/heater_schedule/update' : '/api/heater_schedule/add', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  }).then(response => {
+    if (!response.ok) throw new Error('Heater schedule save failed');
+    hideHeaterScheduleEditor();
+    refreshHeaterSchedule();
+  }).catch(error => {
+    console.error('Error saving heater schedule entry:', error);
+    alert('Failed to save heater schedule entry');
+  });
+}
+function deleteScheduleEntry(index){
+  if(!confirm('Delete this schedule entry?')) return;
+  fetch(`/api/schedule/delete?index=${index}`)
+    .then(response => { if(!response.ok) throw new Error('Delete failed'); refreshSchedule(); })
+    .catch(error => { console.error('Error deleting schedule entry:', error); alert('Failed to delete schedule entry'); });
+}
+function deleteHeaterScheduleEntry(index){
+  if(!confirm('Delete this heater schedule entry?')) return;
+  fetch(`/api/heater_schedule/delete?index=${index}`)
+    .then(response => { if(!response.ok) throw new Error('Delete failed'); refreshHeaterSchedule(); })
+    .catch(error => { console.error('Error deleting heater schedule entry:', error); alert('Failed to delete heater schedule entry'); });
+}
+function refreshSchedule(){
+  const list = document.getElementById('schedule-list');
+  if (!list) return;
+  list.hidden = false;
+  const editor = document.getElementById('schedule-editor');
+  editor.classList.add('hidden');
+  editor.innerHTML='';
+  scheduleEditorActions = [0,0,0,0];
+  list.innerHTML = '<div class="empty-state">Loading schedule entries...</div>';
+  fetch('/api/schedule/list')
+    .then(response => response.json())
+    .then(entries => {
+      if(!Array.isArray(entries) || entries.length === 0){
+        list.innerHTML = '<div class="empty-state">No schedule entries found.</div>';
+        return;
+      }
+      list.innerHTML = entries.map(entry => {
+        const dayText = dayMaskToText(entry.days ?? entry.day ?? 0);
+        const timeText = `${String(entry.start_hour ?? entry.hour ?? 0).padStart(2,'0')}:${String(entry.start_minute ?? entry.minute ?? 0).padStart(2,'0')}`;
+        const actions = Array.isArray(entry.actions) ? entry.actions : [0,0,0,0];
+        const circuitText = actions.map((value, index) => `${getCircuitLabel(index)}: ${value === 1 ? 'ON' : value === 2 ? 'OFF' : 'DC'}`).join(', ');
+        return `
+          <div class="schedule-item">
+            <div>
+              <div style="font-weight:800;color:var(--text);">${escapeHtml(timeText)}</div>
+              <div class="meta">Days: ${escapeHtml(dayText)}</div>
+              <div class="meta">${escapeHtml(circuitText)}</div>
+            </div>
+            <div class="actions">
+              <button class="btn" type="button" data-edit-schedule="${entry.index}">Edit</button>
+              <button class="btn" type="button" data-delete-schedule="${entry.index}">Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      list.querySelectorAll('[data-edit-schedule]').forEach(btn => btn.addEventListener('click', () => {
+        const index = Number(btn.getAttribute('data-edit-schedule'));
+        fetch(`/api/schedule/get?index=${index}`)
+          .then(response => response.json())
+          .then(entry => openScheduleEditor(entry))
+          .catch(error => { console.error('Error fetching schedule entry:', error); alert('Error fetching schedule entry'); });
+      }));
+      list.querySelectorAll('[data-delete-schedule]').forEach(btn => btn.addEventListener('click', () => deleteScheduleEntry(Number(btn.getAttribute('data-delete-schedule')))));
+    })
+    .catch(error => {
+      console.error('Error fetching schedule:', error);
+      list.innerHTML = '<div class="empty-state">Error loading schedule entries.</div>';
+    });
+}
+function refreshHeaterSchedule(){
+  const list = document.getElementById('heater-schedule-list');
+  if (!list) return;
+  list.hidden = false;
+  const editor = document.getElementById('heater-schedule-editor');
+  editor.classList.add('hidden');
+  editor.innerHTML='';
+  heaterScheduleEditorOpen=false;
+  list.innerHTML = '<div class="empty-state">Loading heater schedule entries...</div>';
+  fetch('/api/heater_schedule/list')
+    .then(response => response.json())
+    .then(entries => {
+      if(!Array.isArray(entries) || entries.length === 0){
+        list.innerHTML = '<div class="empty-state">No heater schedule entries found.</div>';
+        return;
+      }
+      list.innerHTML = entries.map(entry => {
+        const dayText = dayMaskToText(entry.days ?? entry.day ?? 0);
+        const readyBy = `${String(entry.target_hour ?? 0).padStart(2,'0')}:${String(entry.target_minute ?? 0).padStart(2,'0')}`;
+        const holdUntil = `${String(entry.stop_hour ?? 0).padStart(2,'0')}:${String(entry.stop_minute ?? 0).padStart(2,'0')}`;
+        return `
+          <div class="schedule-item" style="background:rgba(255,196,0,.08);">
+            <div>
+              <div style="font-weight:800;color:var(--text);">${escapeHtml(Number(entry.target_temp ?? 0).toFixed(1))}°F by ${escapeHtml(readyBy)}</div>
+              <div class="meta">Hold Until: ${escapeHtml(holdUntil)}</div>
+              <div class="meta">Days: ${escapeHtml(dayText)}</div>
+            </div>
+            <div class="actions">
+              <button class="btn" type="button" data-edit-heater="${entry.index}">Edit</button>
+              <button class="btn" type="button" data-delete-heater="${entry.index}">Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      list.querySelectorAll('[data-edit-heater]').forEach(btn => btn.addEventListener('click', () => {
+        const index = Number(btn.getAttribute('data-edit-heater'));
+        fetch(`/api/heater_schedule/get?index=${index}`)
+          .then(response => response.json())
+          .then(entry => openHeaterScheduleEditor(entry))
+          .catch(error => { console.error('Error fetching heater schedule entry:', error); alert('Error fetching heater schedule entry'); });
+      }));
+      list.querySelectorAll('[data-delete-heater]').forEach(btn => btn.addEventListener('click', () => deleteHeaterScheduleEntry(Number(btn.getAttribute('data-delete-heater')))));
+    })
+    .catch(error => {
+      console.error('Error fetching heater schedule:', error);
+      list.innerHTML = '<div class="empty-state">Error loading heater schedule entries.</div>';
+    });
+}
+
+const KEY='mypool-mac';
+function normalizeMac(value){return String(value||'').toUpperCase().replace(/[^0-9A-F]/g,'');}
+function macFromQuery(){
+  const params = new URLSearchParams(window.location.search);
+  return normalizeMac(params.get('mac') || params.get('id') || params.get('unique_id'));
+}
+let MAC = macFromQuery() || normalizeMac(localStorage.getItem(KEY));
+if (MAC) {
+  localStorage.setItem(KEY, MAC);
+  histogramKey = `mypool-hist-${MAC}`;
+  loadHistogramPoints();
+  if (window.location.search) {
+    const cleanUrl = window.location.pathname + window.location.hash;
+    window.history.replaceState({}, '', cleanUrl);
+  }
+} else {
+  loadHistogramPoints();
+}
+
+// Bake this device's MAC into the installable manifest's start_url so that
+// "Add to Home Screen" / native install (which launches whatever start_url
+// the manifest declares, NOT the URL that happened to be on screen) always
+// reopens THIS controller, even if another MyPool.AI controller was installed
+// from the same origin and left a different MAC in localStorage.
+function setDynamicManifest(mac){
+  try {
+    const manifest = {
+      name: 'MyPool.AI',
+      short_name: 'MyPool.AI',
+      display: 'standalone',
+      start_url: mac ? `./index.html?mac=${encodeURIComponent(mac)}` : './',
+      background_color: '#0b1220',
+      theme_color: '#0b1220',
+      icons: [
+        { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: 'icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    const link = document.querySelector('link[rel="manifest"]');
+    if (link) link.setAttribute('href', URL.createObjectURL(blob));
+  } catch (_) {}
+}
+setDynamicManifest(MAC);
+
+const MQTT_URL='ws://pgiatis.dyndns.org:9001/mqtt';
+const MQTT_OPTS={username:'BisinaSystems',password:'BisinaSystems123',reconnectPeriod:0};
+let client=null;let reconnectTimer=null;
+const circuitAliases=new Map();const aliasGroups=new Map();const circuitPower=new Map();const circuitStatus=new Map();
+let aiMode=0;let aiHeatRate='--';let aiRateInterp=0;
+
+function updateFooterStatus(extra){
+  const modeLabel = modeName(modeState);
+  const aiLabel = aiMode ? 'AI ON' : 'AI OFF';
+  const interpLabel = aiRateInterp ? 'interp' : 'exact';
+  const suffix = extra ? ` | ${extra}` : '';
+  setFoot(`Connected ${MAC} | ${modeLabel} | ${aiLabel} | Rate ${aiHeatRate} (${interpLabel})${suffix}`);
+}
+
+function formatTargetTime(raw){
+  if(!raw) return '--';
+  const v=String(raw).trim();
+  if(/^\d{2}:\d{2}$/.test(v)) return v;
+  if(/^\d{4}$/.test(v)) return `${v.slice(0,2)}:${v.slice(2)}`;
+  return v;
+}
+function updateButton(alias){
+  const btn=document.querySelector(`[data-alias='${alias}']`);
+  if(!btn)return;
+  const grp=aliasGroups.get(alias);
+  if(!grp)return;
+  const totalW=[...grp.circuits].reduce((s,i)=>s+(circuitPower.get(i)||0),0);
+  btn.querySelector('.small').textContent=formatW(totalW);
+  btn.classList.toggle('on',grp.anyOn);
+}
+function ensureButton(alias){
+  if(document.querySelector(`[data-alias='${alias}']`))return;
+  const grp=aliasGroups.get(alias);
+  const btn=document.createElement('button');
+  btn.className='pill'+(grp.anyOn?' on':'');
+  btn.dataset.alias=alias;
+  const totalW=[...grp.circuits].reduce((s,i)=>s+(circuitPower.get(i)||0),0);
+  btn.innerHTML=`<span class="name">${alias||'Circuit'}</span><span class="small">${formatW(totalW)}</span>`;
+  btn.onclick=()=>{
+    grp.anyOn=!grp.anyOn;
+    updateButton(alias);
+    const next=grp.anyOn?1:0;
+    for(const idx of grp.circuits){
+      client?.publish(`${MAC}/control/set_circuit`,`${idx}:${next}`);
+    }
+  };
+  controlsEl.appendChild(btn);
+}
+function recomputeGroups(){
+  aliasGroups.clear();
+  for(const[idx,alias]of circuitAliases){
+    const key=alias||`Circuit ${idx}`;
+    if(!aliasGroups.has(key))aliasGroups.set(key,{circuits:new Set(),anyOn:false});
+    aliasGroups.get(key).circuits.add(idx);
+  }
+  for(const[,grp]of aliasGroups){grp.anyOn=[...grp.circuits].some(i=>(Number(circuitStatus.get(i))||0)===1);}
+  for(const[alias]of aliasGroups){ensureButton(alias);updateButton(alias);}
+}
+let setTemp=0;let modeState=0;
+function modeName(v){
+  if(v===0) return 'Off';
+  if(v===1) return 'Continuous';
+  if(v===2) return 'Scheduled';
+  if(v===3) return 'Scheduled AI';
+  return 'Unknown';
+}
+function onMsg(topic,payloadBuf){
+  if(!topic.startsWith(MAC+'/'))return;
+  const payload=new TextDecoder().decode(payloadBuf);
+  if(topic.endsWith('/sensors/water_temperature'))$('#valWater').firstChild.textContent=formatF(payload);
+  if(topic.endsWith('/sensors/water_temperature')) latestTelemetry.water = Number(payload);
+  else if(topic.endsWith('/sensors/set_temperature')){$('#valSet').textContent=formatF(payload);setTemp=parseFloat(payload)||0;}
+  else if(topic.endsWith('/sensors/external_temperature')){$('#valAir').textContent=formatF(payload); latestTelemetry.air = Number(payload);}
+  else if(topic.endsWith('/sensors/internal_temperature')){$('#valCtrl').textContent=formatF(payload); latestTelemetry.ctrl = Number(payload);}
+  else if(topic.endsWith('/sensors/lux')){$('#valLux').textContent=formatLux(payload); latestTelemetry.lux = Number(payload);}
+  else if(topic.endsWith('/sensors/mode_of_operation')){
+    const v=parseInt(payload);modeState=isNaN(v)?0:v;$('#valMode').textContent=modeName(modeState);
+    if(client && client.connected){updateFooterStatus();}
+  }
+  else if(topic.endsWith('/sensors/heater_status')){
+    const val=parseInt(payload);flame.style.display=(val===1)?'inline-flex':'none';
+    latestTelemetry.heater = (val===1)?1:0;
+  }
+  else if(topic.endsWith('/sensors/intelligent_mode')){
+    aiMode=parseInt(payload)||0;
+    if(client && client.connected){updateFooterStatus();}
+  }
+  else if(topic.endsWith('/sensors/intelligent_heat_rate')){
+    const n=Number(payload);
+    aiHeatRate=Number.isFinite(n)?n.toFixed(2)+' F/hr':payload;
+    if(client && client.connected){updateFooterStatus();}
+  }
+  else if(topic.endsWith('/sensors/intelligent_rate_interpolated')){
+    aiRateInterp=parseInt(payload)||0;
+    if(client && client.connected){updateFooterStatus();}
+  }
+  else if(/\/sensors\/circuit_(\d+)_alias$/.test(topic)){
+    const m=topic.match(/circuit_(\d+)_alias$/);const idx=Number(m[1]);
+    circuitAliases.set(idx,payload.trim());recomputeGroups();
+  }
+  else if(/\/sensors\/circuit_(\d+)_power$/.test(topic)){
+    const m=topic.match(/circuit_(\d+)_power$/);const idx=Number(m[1]);
+    circuitPower.set(idx,Number(payload));
+    if (idx >= 1 && idx <= 4) latestTelemetry.power[idx - 1] = Number(payload);
+    for(const[alias,grp]of aliasGroups){if(grp.circuits.has(idx))updateButton(alias);}
+  }
+  else if(/\/sensors\/relay_(\d+)_status$/.test(topic)){
+    const m=topic.match(/relay_(\d+)_status$/);const idx=Number(m[1]);
+    circuitStatus.set(idx,Number(payload));
+    if (idx >= 1 && idx <= 4) latestTelemetry.state[idx - 1] = Number(payload) > 0 ? 1 : 0;
+    for(const[alias,grp]of aliasGroups){
+      const before=grp.anyOn;
+      grp.anyOn=[...grp.circuits].some(i=>(Number(circuitStatus.get(i))||0)===1);
+      if(before!==grp.anyOn)updateButton(alias);
+    }
+  }
+}
+function connect(){
+  if(!MAC){setFoot('No device id provided. Use the embedded install link.');return;}
+  if(client){client.end(true);client=null;}
+  setDot('#ffb84d');setFoot('Connecting…');
+  try{
+    client=mqtt.connect(MQTT_URL,MQTT_OPTS);
+    client.on('connect',()=>{
+      addHistogramEvent(hasConnectedOnce ? 'Reconnect' : 'Connected');
+      hasConnectedOnce = true;
+      setDot('#2cd186');
+      updateFooterStatus('syncing...');
+      client.subscribe(MAC+'/#');
+      client.publish(MAC+'/control/read_alias','');
+      client.publish(MAC+'/control/read_circuit_status','');
+      client.publish(MAC+'/control/read_heater_status','');
+      client.publish(MAC+'/control/read_intelligent_status','');
+      client.publish(MAC+'/control/read_schedule','');
+      fetchUptimeAndDetectReboot();
+    });
+    client.on('message',onMsg);
+    client.on('close',()=>{addHistogramEvent('Disconnected');setDot('#7a8699');setFoot('Disconnected');scheduleReconnect();});
+    client.on('error',e=>{setDot('#ff6b6b');setFoot('Error: '+(e?.message||'unknown'));client.end(true);scheduleReconnect();});
+  }catch(e){setDot('#ff6b6b');setFoot('Connect exception: '+e.message);scheduleReconnect();}
+}
+function scheduleReconnect(){if(reconnectTimer)return;reconnectTimer=setTimeout(()=>{reconnectTimer=null;connect();},5000);}
+
+$('#btnScheduleOpen').onclick = showScheduleModal;
+$('#btnHeaterScheduleOpen').onclick = showHeaterScheduleModal;
+document.getElementById('btnScheduleLogsOpen').onclick = showScheduleLogModal;
+$('#btnHistogramOpen').onclick = showHistogramModal;
+document.getElementById('btnInstallApp').onclick = installApp;
+document.getElementById('schedule-modal-close').onclick = hideScheduleModal;
+document.getElementById('heater-schedule-modal-close').onclick = hideHeaterScheduleModal;
+document.getElementById('histogram-modal-close').onclick = hideHistogramModal;
+document.getElementById('schedule-log-modal-close').onclick = hideScheduleLogModal;
+document.getElementById('install-help-modal-close').onclick = () => closeModal('install-help-modal');
+document.getElementById('schedule-modal').addEventListener('click', e => { if (e.target.id === 'schedule-modal') hideScheduleModal(); });
+document.getElementById('heater-schedule-modal').addEventListener('click', e => { if (e.target.id === 'heater-schedule-modal') hideHeaterScheduleModal(); });
+document.getElementById('histogram-modal').addEventListener('click', e => { if (e.target.id === 'histogram-modal') hideHistogramModal(); });
+document.getElementById('schedule-log-modal').addEventListener('click', e => { if (e.target.id === 'schedule-log-modal') hideScheduleLogModal(); });
+document.getElementById('install-help-modal').addEventListener('click', e => { if (e.target.id === 'install-help-modal') closeModal('install-help-modal'); });
+document.getElementById('schedule-add-btn').onclick = () => { openScheduleEditor(null); };
+document.getElementById('schedule-refresh-btn').onclick = refreshSchedule;
+document.getElementById('heater-schedule-add-btn').onclick = () => { openHeaterScheduleEditor(null); };
+document.getElementById('heater-schedule-refresh-btn').onclick = refreshHeaterSchedule;
+document.getElementById('histogram-refresh-btn').onclick = () => { fetchUptimeAndDetectReboot().finally(() => renderHistogram()); };
+document.getElementById('schedule-log-refresh-btn').onclick = refreshScheduleLogs;
+document.getElementById('schedule-log-clear-btn').onclick = clearScheduleLogs;
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  updateInstallButton();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  updateInstallButton();
+  setFoot('MyPool.AI installed');
+});
+
+if(MAC){connect();}
+updateInstallButton();
+bindHistogramControls();
+setHistogramRefreshInterval(HISTOGRAM_REFRESH_MS);
+setInterval(() => { sampleHistogram(false); }, HISTOGRAM_SAMPLE_MS);
+$('#btnUp').onclick=()=>{setTemp++;$('#valSet').textContent=setTemp.toFixed(1)+'°F';client?.publish(`${MAC}/control/set_temperature`,String(setTemp));};
+$('#btnDown').onclick=()=>{setTemp--;$('#valSet').textContent=setTemp.toFixed(1)+'°F';client?.publish(`${MAC}/control/set_temperature`,String(setTemp));};
+$('#valMode').onclick=()=>{modeState=(modeState+1)%4;$('#valMode').textContent=modeName(modeState);client?.publish(`${MAC}/control/set_mode`,String(modeState));};
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('service-worker-fixed.js').catch(()=>{});});}
+</script>
+</body>
+</html>
