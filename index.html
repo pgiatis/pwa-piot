@@ -79,6 +79,11 @@
   .hist-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
   .hist-controls label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
   .hist-controls .group-title{font-size:12px;color:var(--muted);font-weight:700;margin-left:4px}
+  .sysinfo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .sysinfo-item{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:10px}
+  .sysinfo-label{font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+  .sysinfo-value{font-size:14px;color:var(--text);font-weight:700;word-break:break-word}
+  @media(max-width:760px){.sysinfo-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -106,6 +111,7 @@
         <button id="btnHeaterScheduleOpen" class="btn">Heater Schedule Settings</button>
         <button id="btnScheduleLogsOpen" class="btn">Schedule Event Logs</button>
         <button id="btnHistogramOpen" class="btn">Histogram</button>
+        <button id="btnSystemInfo" class="btn">System Information</button>
         <button id="btnInstallApp" class="btn">Add To Phone Home Screen</button>
       </div>
 
@@ -202,6 +208,28 @@
     </div>
   </div>
 
+  <div class="modal" id="system-info-modal">
+    <div class="modal-card" style="width:min(760px,100%);">
+      <div class="modal-head">
+        <div class="modal-title">System Information</div>
+        <button class="modal-close" id="system-info-modal-close" type="button">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="sysinfo-grid">
+          <div class="sysinfo-item"><div class="sysinfo-label">Unique ID</div><div class="sysinfo-value" id="sys-unique-id">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">Serial Number</div><div class="sysinfo-value" id="sys-serial-number">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">Firmware Version</div><div class="sysinfo-value" id="sys-firmware-version">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">Hardware Version</div><div class="sysinfo-value" id="sys-hardware-version">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">IP Address</div><div class="sysinfo-value" id="sys-ip-address">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">MQTT Endpoint</div><div class="sysinfo-value" id="sys-mqtt-endpoint">--</div></div>
+        </div>
+        <div class="modal-actions" style="justify-content:flex-end;">
+          <button id="system-info-ok-btn" class="btn" type="button">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
@@ -241,6 +269,28 @@ let latestTelemetry={
   heater:null,
   uptimeSec:null
 };
+const sysInfo = {
+  uniqueId: '--',
+  serialNumber: '--',
+  firmwareVersion: '--',
+  hardwareVersion: '--',
+  ipAddress: '--'
+};
+
+function updateSystemInfoModal(){
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value || '--';
+  };
+  set('sys-unique-id', sysInfo.uniqueId);
+  set('sys-serial-number', sysInfo.serialNumber);
+  set('sys-firmware-version', sysInfo.firmwareVersion);
+  set('sys-hardware-version', sysInfo.hardwareVersion);
+  set('sys-ip-address', sysInfo.ipAddress);
+  set('sys-mqtt-endpoint', MQTT_URL || '--');
+}
+function showSystemInfoModal(){ updateSystemInfoModal(); openModal('system-info-modal'); }
+function hideSystemInfoModal(){ closeModal('system-info-modal'); }
 
 function histogramAlias(index1to4){
   return (circuitAliases.get(index1to4) || circuitAliases.get(index1to4 - 1) || `Circuit ${index1to4}`);
@@ -964,6 +1014,7 @@ if (DEVICE_ID) {
 }
 
 MAC = DEVICE_ID.toUpperCase();
+sysInfo.uniqueId = MAC || '--';
 
 // Keep the PWA installable from GitHub Pages without hard-coded root paths.
 function setDynamicManifest(mac){
@@ -1098,6 +1149,22 @@ function onMsg(topic,payloadBuf){
     aiRateInterp=parseInt(payload)||0;
     if(client && client.connected){updateFooterStatus();}
   }
+  else if(topic.endsWith('/sensors/firmware_version')){
+    sysInfo.firmwareVersion = payload || '--';
+    updateSystemInfoModal();
+  }
+  else if(topic.endsWith('/sensors/hardware_version')){
+    sysInfo.hardwareVersion = payload || '--';
+    updateSystemInfoModal();
+  }
+  else if(topic.endsWith('/sensors/serial_number')){
+    sysInfo.serialNumber = payload || '--';
+    updateSystemInfoModal();
+  }
+  else if(topic.endsWith('/sensors/ip_address')){
+    sysInfo.ipAddress = payload || '--';
+    updateSystemInfoModal();
+  }
   else if(/\/sensors\/circuit_(\d+)_alias$/.test(topic)){
     const m=topic.match(/circuit_(\d+)_alias$/);const idx=Number(m[1]);
     circuitAliases.set(idx,payload.trim());recomputeGroups();
@@ -1165,17 +1232,21 @@ $('#btnScheduleOpen').onclick = showScheduleModal;
 $('#btnHeaterScheduleOpen').onclick = showHeaterScheduleModal;
 document.getElementById('btnScheduleLogsOpen').onclick = showScheduleLogModal;
 $('#btnHistogramOpen').onclick = showHistogramModal;
+document.getElementById('btnSystemInfo').onclick = showSystemInfoModal;
 document.getElementById('btnInstallApp').onclick = installApp;
 document.getElementById('schedule-modal-close').onclick = hideScheduleModal;
 document.getElementById('heater-schedule-modal-close').onclick = hideHeaterScheduleModal;
 document.getElementById('histogram-modal-close').onclick = hideHistogramModal;
 document.getElementById('schedule-log-modal-close').onclick = hideScheduleLogModal;
 document.getElementById('install-help-modal-close').onclick = () => closeModal('install-help-modal');
+document.getElementById('system-info-modal-close').onclick = hideSystemInfoModal;
+document.getElementById('system-info-ok-btn').onclick = hideSystemInfoModal;
 document.getElementById('schedule-modal').addEventListener('click', e => { if (e.target.id === 'schedule-modal') hideScheduleModal(); });
 document.getElementById('heater-schedule-modal').addEventListener('click', e => { if (e.target.id === 'heater-schedule-modal') hideHeaterScheduleModal(); });
 document.getElementById('histogram-modal').addEventListener('click', e => { if (e.target.id === 'histogram-modal') hideHistogramModal(); });
 document.getElementById('schedule-log-modal').addEventListener('click', e => { if (e.target.id === 'schedule-log-modal') hideScheduleLogModal(); });
 document.getElementById('install-help-modal').addEventListener('click', e => { if (e.target.id === 'install-help-modal') closeModal('install-help-modal'); });
+document.getElementById('system-info-modal').addEventListener('click', e => { if (e.target.id === 'system-info-modal') hideSystemInfoModal(); });
 document.getElementById('schedule-add-btn').onclick = () => { openScheduleEditor(null); };
 document.getElementById('schedule-refresh-btn').onclick = refreshSchedule;
 document.getElementById('heater-schedule-add-btn').onclick = () => { openHeaterScheduleEditor(null); };
