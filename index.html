@@ -47,14 +47,6 @@
   .histogram-panel{height:58vh;min-height:320px}
   .histogram-panel canvas{width:100%;height:100%}
   .footer{margin-top:12px;background:#0a162b;border:1px solid var(--border);border-radius:12px;padding:10px;color:#9fb0c9;font-size:12px}
-  .footer-status{margin-bottom:8px}
-  .footer-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 12px;text-align:left}
-  .footer-item{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .footer-label{opacity:.9}
-  .sysinfo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
-  .sysinfo-item{background:rgba(0,0,0,.16);border:1px solid var(--border);border-radius:10px;padding:8px}
-  .sysinfo-label{font-size:11px;color:var(--muted)}
-  .sysinfo-value{margin-top:4px;font-size:13px;font-weight:700;color:var(--text);word-break:break-word}
   .btn{appearance:none;border:1px solid #2b84ff55;background:linear-gradient(145deg,#18325f,#0f2347);color:#e7edf7;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:700}
   .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.72);z-index:2000;padding:14px}
   .modal-card{width:min(920px,100%);max-height:90vh;overflow:auto;background:linear-gradient(145deg,#0f2347,#0b1830);border:1px solid var(--border);border-radius:18px;padding:16px;box-shadow:0 25px 80px rgba(0,0,0,.35)}
@@ -114,37 +106,13 @@
         <button id="btnHeaterScheduleOpen" class="btn">Heater Schedule Settings</button>
         <button id="btnScheduleLogsOpen" class="btn">Schedule Event Logs</button>
         <button id="btnHistogramOpen" class="btn">Histogram</button>
-        <button id="btnSystemInfo" class="btn">System Information</button>
+        <button id="btnInstallApp" class="btn">Add To Phone Home Screen</button>
       </div>
 
   </div>
 
-  <div class="footer">
-    <div class="footer-status" id="foot">Disconnected</div>
-  </div>
+  <div class="footer" id="foot">Disconnected</div>
 </div>
-
-  <div class="modal" id="system-info-modal">
-    <div class="modal-card">
-      <div class="modal-head">
-        <div class="modal-title">System Information</div>
-        <button class="modal-close" id="system-info-modal-close" type="button">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="sysinfo-grid">
-          <div class="sysinfo-item"><div class="sysinfo-label">Connected to</div><div class="sysinfo-value" id="meta-connected">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">Unique ID</div><div class="sysinfo-value" id="meta-unique-id">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">Serial Number</div><div class="sysinfo-value" id="meta-serial">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">IP Address</div><div class="sysinfo-value" id="meta-ip">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">Firmware Version</div><div class="sysinfo-value" id="meta-fw">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">Hardware Version</div><div class="sysinfo-value" id="meta-hw">--</div></div>
-        </div>
-        <div class="modal-actions">
-          <button id="system-info-ok-btn" class="btn" type="button">OK</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <div class="modal" id="schedule-modal">
     <div class="modal-card">
@@ -239,28 +207,7 @@
 <script>
 const $=s=>document.querySelector(s);
 const dot=$('#dot');const foot=$('#foot');const controlsEl=$('#controls');const flame=$('#flame');
-const metaConnected = $('#meta-connected');
-const metaUniqueId = $('#meta-unique-id');
-const metaSerial = $('#meta-serial');
-const metaFw = $('#meta-fw');
-const metaHw = $('#meta-hw');
-const metaIp = $('#meta-ip');
-const MQTT_BROKER = 'pgiatis.dyndns.org';
-const MQTT_PATH = '/mqtt';
-const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}${MQTT_PATH}`;
-let fwVersionLabel='--';
-let hwVersionLabel='--';
-let serialNumberLabel='--';
-let ipAddressLabel='--';
-function refreshFooterMeta(){
-  if (metaConnected) metaConnected.textContent = MQTT_BROKER;
-  if (metaUniqueId) metaUniqueId.textContent = MAC || '--';
-  if (metaSerial) metaSerial.textContent = serialNumberLabel;
-  if (metaFw) metaFw.textContent = fwVersionLabel;
-  if (metaHw) metaHw.textContent = hwVersionLabel;
-  if (metaIp) metaIp.textContent = ipAddressLabel;
-}
-function setDot(c){dot.style.background=c;}function setFoot(m){foot.textContent=m;refreshFooterMeta();}
+function setDot(c){dot.style.background=c;}function setFoot(m){foot.textContent=m;}
 function formatF(v){if(v==null||v==='')return'—';const n=Number(v);if(Number.isFinite(n))return n.toFixed(1)+'°F';return String(v);}
 function formatLux(v){const n=Number(v);return Number.isFinite(n)?n.toFixed(0)+' lx':'—';}
 function formatW(v){const n=Number(v);return Number.isFinite(n)?n.toFixed(1)+' W':'0.0 W';}
@@ -1017,7 +964,6 @@ if (DEVICE_ID) {
 }
 
 MAC = DEVICE_ID.toUpperCase();
-refreshFooterMeta();
 
 // Keep the PWA installable from GitHub Pages without hard-coded root paths.
 function setDynamicManifest(mac){
@@ -1042,6 +988,10 @@ function setDynamicManifest(mac){
   } catch (_) {}
 }
 setDynamicManifest(DEVICE_ID);
+
+const MQTT_BROKER = 'pgiatis.dyndns.org';
+const MQTT_PATH = '/mqtt';
+const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}${MQTT_PATH}`;
 const MQTT_OPTS={username:'BisinaSystems',password:'BisinaSystems123',reconnectPeriod:0};
 let client=null;let reconnectTimer=null;
 const circuitAliases=new Map();const aliasGroups=new Map();const circuitPower=new Map();const circuitStatus=new Map();
@@ -1148,28 +1098,6 @@ function onMsg(topic,payloadBuf){
     aiRateInterp=parseInt(payload)||0;
     if(client && client.connected){updateFooterStatus();}
   }
-  else if(topic.endsWith('/sensors/firmware_version')){
-    const n=Number(payload);
-    fwVersionLabel=Number.isFinite(n)?n.toFixed(2):String(payload);
-    refreshFooterMeta();
-    if(client && client.connected){updateFooterStatus();}
-  }
-  else if(topic.endsWith('/sensors/hardware_version')){
-    const n=Number(payload);
-    hwVersionLabel=Number.isFinite(n)?n.toFixed(2):String(payload);
-    refreshFooterMeta();
-    if(client && client.connected){updateFooterStatus();}
-  }
-  else if(topic.endsWith('/sensors/serial_number')){
-    serialNumberLabel=String(payload || '').trim() || '--';
-    refreshFooterMeta();
-    if(client && client.connected){updateFooterStatus();}
-  }
-  else if(topic.endsWith('/sensors/ip_address')){
-    ipAddressLabel=String(payload || '').trim() || '--';
-    refreshFooterMeta();
-    if(client && client.connected){updateFooterStatus();}
-  }
   else if(/\/sensors\/circuit_(\d+)_alias$/.test(topic)){
     const m=topic.match(/circuit_(\d+)_alias$/);const idx=Number(m[1]);
     circuitAliases.set(idx,payload.trim());recomputeGroups();
@@ -1233,34 +1161,21 @@ function scheduleReconnect(){
   },5000);
 }
 
-function showSystemInfoModal(){
-  const modal = document.getElementById('system-info-modal');
-  if (modal) modal.style.display = 'flex';
-}
-
-function hideSystemInfoModal(){
-  const modal = document.getElementById('system-info-modal');
-  if (modal) modal.style.display = 'none';
-}
-
 $('#btnScheduleOpen').onclick = showScheduleModal;
 $('#btnHeaterScheduleOpen').onclick = showHeaterScheduleModal;
 document.getElementById('btnScheduleLogsOpen').onclick = showScheduleLogModal;
 $('#btnHistogramOpen').onclick = showHistogramModal;
-document.getElementById('btnSystemInfo').onclick = showSystemInfoModal;
+document.getElementById('btnInstallApp').onclick = installApp;
 document.getElementById('schedule-modal-close').onclick = hideScheduleModal;
 document.getElementById('heater-schedule-modal-close').onclick = hideHeaterScheduleModal;
 document.getElementById('histogram-modal-close').onclick = hideHistogramModal;
 document.getElementById('schedule-log-modal-close').onclick = hideScheduleLogModal;
 document.getElementById('install-help-modal-close').onclick = () => closeModal('install-help-modal');
-document.getElementById('system-info-modal-close').onclick = hideSystemInfoModal;
-document.getElementById('system-info-ok-btn').onclick = hideSystemInfoModal;
 document.getElementById('schedule-modal').addEventListener('click', e => { if (e.target.id === 'schedule-modal') hideScheduleModal(); });
 document.getElementById('heater-schedule-modal').addEventListener('click', e => { if (e.target.id === 'heater-schedule-modal') hideHeaterScheduleModal(); });
 document.getElementById('histogram-modal').addEventListener('click', e => { if (e.target.id === 'histogram-modal') hideHistogramModal(); });
 document.getElementById('schedule-log-modal').addEventListener('click', e => { if (e.target.id === 'schedule-log-modal') hideScheduleLogModal(); });
 document.getElementById('install-help-modal').addEventListener('click', e => { if (e.target.id === 'install-help-modal') closeModal('install-help-modal'); });
-document.getElementById('system-info-modal').addEventListener('click', e => { if (e.target.id === 'system-info-modal') hideSystemInfoModal(); });
 document.getElementById('schedule-add-btn').onclick = () => { openScheduleEditor(null); };
 document.getElementById('schedule-refresh-btn').onclick = refreshSchedule;
 document.getElementById('heater-schedule-add-btn').onclick = () => { openHeaterScheduleEditor(null); };
