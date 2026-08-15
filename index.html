@@ -990,9 +990,8 @@ function setDynamicManifest(mac){
 setDynamicManifest(DEVICE_ID);
 
 const MQTT_BROKER = 'pgiatis.dyndns.org';
-const MQTT_PORT = '9001';
 const MQTT_PATH = '/mqtt';
-const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}:${MQTT_PORT}${MQTT_PATH}`;
+const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}${MQTT_PATH}`;
 const MQTT_OPTS={username:'BisinaSystems',password:'BisinaSystems123',reconnectPeriod:0};
 let client=null;let reconnectTimer=null;
 const circuitAliases=new Map();const aliasGroups=new Map();const circuitPower=new Map();const circuitStatus=new Map();
