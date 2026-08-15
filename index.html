@@ -939,7 +939,7 @@ function refreshHeaterSchedule(){
 const KEY='mypool-mac';
 const DEVICE_KEY='piotDeviceId';
 function normalizeDeviceId(value){
-  return String(value || '').trim().toUpperCase().replace(/[^A-F0-9]/g, '');
+  return String(value || '').trim().toLowerCase().replace(/[^a-f0-9]/g, '');
 }
 function deviceFromQuery(){
   const params = new URLSearchParams(window.location.search);
@@ -950,6 +950,12 @@ if (DEVICE_ID) {
   localStorage.setItem(DEVICE_KEY, DEVICE_ID);
   if (localStorage.getItem(KEY) !== DEVICE_ID) {
     localStorage.setItem(KEY, DEVICE_ID);
+  }
+  const hasDeviceInUrl = new URLSearchParams(window.location.search).has('device');
+  if (!hasDeviceInUrl) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('device', DEVICE_ID);
+    window.history.replaceState({}, '', url.toString());
   }
   histogramKey = `mypool-hist-${DEVICE_ID}`;
   loadHistogramPoints();
@@ -966,7 +972,7 @@ function setDynamicManifest(mac){
       name: 'MyPool.AI',
       short_name: 'MyPool.AI',
       display: 'standalone',
-      start_url: './',
+      start_url: mac ? `./?device=${encodeURIComponent(mac)}` : './',
       scope: './',
       background_color: '#0b1220',
       theme_color: '#0b1220',
@@ -991,6 +997,17 @@ const MQTT_OPTS={username:'BisinaSystems',password:'BisinaSystems123',reconnectP
 let client=null;let reconnectTimer=null;
 const circuitAliases=new Map();const aliasGroups=new Map();const circuitPower=new Map();const circuitStatus=new Map();
 let aiMode=0;let aiHeatRate='--';let aiRateInterp=0;
+
+function mqttDiagSnapshot(stage, detail=''){
+  const queryDevice = new URLSearchParams(window.location.search).get('device') || '';
+  const savedDevice = localStorage.getItem(DEVICE_KEY) || '';
+  const finalDevice = MAC || '';
+  const msg = `[MQTT-DIAG] ${stage} | url=${window.location.href} | query.device=${queryDevice} | saved.${DEVICE_KEY}=${savedDevice} | finalDevice=${finalDevice} | mqttUrl=${MQTT_URL}${detail ? ` | ${detail}` : ''}`;
+  console.log(msg);
+  setFoot(`Diag ${stage} | q=${queryDevice || '-'} | saved=${savedDevice || '-'} | final=${finalDevice || '-'} | ${MQTT_URL}${detail ? ` | ${detail}` : ''}`);
+}
+
+mqttDiagSnapshot('bootstrap');
 
 function updateFooterStatus(extra){
   const modeLabel = modeName(modeState);
@@ -1104,9 +1121,14 @@ function onMsg(topic,payloadBuf){
   }
 }
 function connect(){
-  if(!MAC){setFoot('No device id provided. Use the embedded install link.');return;}
+  if(!MAC){
+    mqttDiagSnapshot('connect_skipped', 'No device id provided');
+    setFoot('No device id provided. Use the embedded install link.');
+    return;
+  }
   if(client){client.end(true);client=null;}
-  setDot('#ffb84d');setFoot('Connecting…');
+  setDot('#ffb84d');
+  mqttDiagSnapshot('connect_start');
   try{
     client=mqtt.connect(MQTT_URL,MQTT_OPTS);
     client.on('connect',()=>{
@@ -1114,6 +1136,7 @@ function connect(){
       hasConnectedOnce = true;
       setDot('#2cd186');
       updateFooterStatus('syncing...');
+      mqttDiagSnapshot('event_connect');
       client.subscribe(MAC+'/#');
       client.publish(MAC+'/control/read_alias','');
       client.publish(MAC+'/control/read_circuit_status','');
@@ -1123,11 +1146,21 @@ function connect(){
       fetchUptimeAndDetectReboot();
     });
     client.on('message',onMsg);
-    client.on('close',()=>{addHistogramEvent('Disconnected');setDot('#7a8699');setFoot('Disconnected');scheduleReconnect();});
-    client.on('error',e=>{setDot('#ff6b6b');setFoot('Error: '+(e?.message||'unknown'));client.end(true);scheduleReconnect();});
-  }catch(e){setDot('#ff6b6b');setFoot('Connect exception: '+e.message);scheduleReconnect();}
+    client.on('reconnect',()=>{mqttDiagSnapshot('event_reconnect');});
+    client.on('close',()=>{addHistogramEvent('Disconnected');setDot('#7a8699');mqttDiagSnapshot('event_close');scheduleReconnect();});
+    client.on('offline',()=>{setDot('#7a8699');mqttDiagSnapshot('event_offline');});
+    client.on('error',e=>{setDot('#ff6b6b');mqttDiagSnapshot('event_error', e?.message || 'unknown');client.end(true);scheduleReconnect();});
+  }catch(e){setDot('#ff6b6b');mqttDiagSnapshot('connect_exception', e.message);scheduleReconnect();}
 }
-function scheduleReconnect(){if(reconnectTimer)return;reconnectTimer=setTimeout(()=>{reconnectTimer=null;connect();},5000);}
+function scheduleReconnect(){
+  if(reconnectTimer) return;
+  mqttDiagSnapshot('reconnect_scheduled', 'in 5000ms');
+  reconnectTimer=setTimeout(()=>{
+    reconnectTimer=null;
+    mqttDiagSnapshot('reconnect_timer_fired');
+    connect();
+  },5000);
+}
 
 $('#btnScheduleOpen').onclick = showScheduleModal;
 $('#btnHeaterScheduleOpen').onclick = showHeaterScheduleModal;
