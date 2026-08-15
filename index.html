@@ -937,15 +937,21 @@ function refreshHeaterSchedule(){
 }
 
 const KEY='mypool-mac';
-function normalizeMac(value){return String(value||'').toUpperCase().replace(/[^0-9A-F]/g,'');}
-function macFromQuery(){
-  const params = new URLSearchParams(window.location.search);
-  return normalizeMac(params.get('mac') || params.get('id') || params.get('unique_id'));
+const DEVICE_KEY='piotDeviceId';
+function normalizeDeviceId(value){
+  return String(value || '').trim().toUpperCase().replace(/[^A-F0-9]/g, '');
 }
-let MAC = macFromQuery() || normalizeMac(localStorage.getItem(KEY));
-if (MAC) {
-  localStorage.setItem(KEY, MAC);
-  histogramKey = `mypool-hist-${MAC}`;
+function deviceFromQuery(){
+  const params = new URLSearchParams(window.location.search);
+  return normalizeDeviceId(params.get('device') || params.get('mac') || params.get('id') || params.get('unique_id'));
+}
+let DEVICE_ID = deviceFromQuery() || normalizeDeviceId(localStorage.getItem(DEVICE_KEY)) || normalizeDeviceId(localStorage.getItem(KEY));
+if (DEVICE_ID) {
+  localStorage.setItem(DEVICE_KEY, DEVICE_ID);
+  if (localStorage.getItem(KEY) !== DEVICE_ID) {
+    localStorage.setItem(KEY, DEVICE_ID);
+  }
+  histogramKey = `mypool-hist-${DEVICE_ID}`;
   loadHistogramPoints();
   if (window.location.search) {
     const cleanUrl = window.location.pathname + window.location.hash;
@@ -955,24 +961,23 @@ if (MAC) {
   loadHistogramPoints();
 }
 
-// Bake this device's MAC into the installable manifest's start_url so that
-// "Add to Home Screen" / native install (which launches whatever start_url
-// the manifest declares, NOT the URL that happened to be on screen) always
-// reopens THIS controller, even if another MyPool.AI controller was installed
-// from the same origin and left a different MAC in localStorage.
+MAC = DEVICE_ID;
+
+// Keep the PWA installable from GitHub Pages without hard-coded root paths.
 function setDynamicManifest(mac){
   try {
     const manifest = {
       name: 'MyPool.AI',
       short_name: 'MyPool.AI',
       display: 'standalone',
-      start_url: mac ? `./index.html?mac=${encodeURIComponent(mac)}` : './',
+      start_url: './',
+      scope: './',
       background_color: '#0b1220',
       theme_color: '#0b1220',
       icons: [
-        { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: 'icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+        { src: './icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: './icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: './icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
       ]
     };
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
@@ -980,9 +985,12 @@ function setDynamicManifest(mac){
     if (link) link.setAttribute('href', URL.createObjectURL(blob));
   } catch (_) {}
 }
-setDynamicManifest(MAC);
+setDynamicManifest(DEVICE_ID);
 
-const MQTT_URL='ws://pgiatis.dyndns.org:9001/mqtt';
+const MQTT_BROKER = 'pgiatis.dyndns.org';
+const MQTT_PORT = '9001';
+const MQTT_PATH = '/mqtt';
+const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}:${MQTT_PORT}${MQTT_PATH}`;
 const MQTT_OPTS={username:'BisinaSystems',password:'BisinaSystems123',reconnectPeriod:0};
 let client=null;let reconnectTimer=null;
 const circuitAliases=new Map();const aliasGroups=new Map();const circuitPower=new Map();const circuitStatus=new Map();
