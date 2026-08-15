@@ -963,7 +963,7 @@ if (DEVICE_ID) {
   loadHistogramPoints();
 }
 
-MAC = DEVICE_ID;
+MAC = DEVICE_ID.toUpperCase();
 
 // Keep the PWA installable from GitHub Pages without hard-coded root paths.
 function setDynamicManifest(mac){
