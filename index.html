@@ -245,6 +245,9 @@ const metaSerial = $('#meta-serial');
 const metaFw = $('#meta-fw');
 const metaHw = $('#meta-hw');
 const metaIp = $('#meta-ip');
+const MQTT_BROKER = 'pgiatis.dyndns.org';
+const MQTT_PATH = '/mqtt';
+const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}${MQTT_PATH}`;
 let fwVersionLabel='--';
 let hwVersionLabel='--';
 let serialNumberLabel='--';
@@ -1039,10 +1042,6 @@ function setDynamicManifest(mac){
   } catch (_) {}
 }
 setDynamicManifest(DEVICE_ID);
-
-const MQTT_BROKER = 'pgiatis.dyndns.org';
-const MQTT_PATH = '/mqtt';
-const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}${MQTT_PATH}`;
 const MQTT_OPTS={username:'BisinaSystems',password:'BisinaSystems123',reconnectPeriod:0};
 let client=null;let reconnectTimer=null;
 const circuitAliases=new Map();const aliasGroups=new Map();const circuitPower=new Map();const circuitStatus=new Map();
