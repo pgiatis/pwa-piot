@@ -366,7 +366,7 @@ function ensureHistogramChart(){
 
 async function fetchUptimeAndDetectReboot(){
   try {
-    const resp = await fetch(apiUrl('/api/sysinfo'));
+    const resp = await fetch('/api/sysinfo');
     if (!resp.ok) return;
     const info = await resp.json();
     const up = Number(info.uptime_sec);
@@ -583,7 +583,7 @@ function refreshScheduleLogs(){
   const logList = document.getElementById('schedule-log-list');
   if (!logList) return;
   logList.innerHTML = '<div class="empty-state">Loading logs...</div>';
-  fetch(apiUrl('/api/schedule/logs'))
+  fetch('/api/schedule/logs')
     .then(response => response.json())
     .then(logs => {
       if (!Array.isArray(logs) || logs.length === 0) {
@@ -608,7 +608,7 @@ function refreshScheduleLogs(){
 
 function clearScheduleLogs(){
   if (!confirm('Clear all schedule event logs? This cannot be undone.')) return;
-  fetch(apiUrl('/api/schedule/logs/clear'))
+  fetch('/api/schedule/logs/clear')
     .then(response => {
       if (!response.ok) throw new Error('Clear logs failed');
       refreshScheduleLogs();
@@ -785,7 +785,7 @@ function submitScheduleEntry(index){
   if(!actions.some(v => v !== 0)){ alert('Please set at least one circuit state'); return; }
   const payload = { days, start_hour: hour, start_minute: minute, actions };
   if (Number.isInteger(index)) payload.index = index;
-  fetch(apiUrl(index !== undefined && index !== null ? '/api/schedule/update' : '/api/schedule/add'), {
+  fetch(index !== undefined && index !== null ? '/api/schedule/update' : '/api/schedule/add', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(payload)
@@ -813,7 +813,7 @@ function submitHeaterScheduleEntry(index){
   if(stopTotal <= targetTotal){ alert('Hold Until must be after Ready By'); return; }
   const payload = { days, target_temp: targetTemp, target_hour: targetHour, target_minute: targetMinute, stop_hour: stopHour, stop_minute: stopMinute };
   if (Number.isInteger(index)) payload.index = index;
-  fetch(apiUrl(index !== undefined && index !== null ? '/api/heater_schedule/update' : '/api/heater_schedule/add'), {
+  fetch(index !== undefined && index !== null ? '/api/heater_schedule/update' : '/api/heater_schedule/add', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(payload)
@@ -828,13 +828,13 @@ function submitHeaterScheduleEntry(index){
 }
 function deleteScheduleEntry(index){
   if(!confirm('Delete this schedule entry?')) return;
-  fetch(apiUrl(`/api/schedule/delete?index=${index}`))
+  fetch(`/api/schedule/delete?index=${index}`)
     .then(response => { if(!response.ok) throw new Error('Delete failed'); refreshSchedule(); })
     .catch(error => { console.error('Error deleting schedule entry:', error); alert('Failed to delete schedule entry'); });
 }
 function deleteHeaterScheduleEntry(index){
   if(!confirm('Delete this heater schedule entry?')) return;
-  fetch(apiUrl(`/api/heater_schedule/delete?index=${index}`))
+  fetch(`/api/heater_schedule/delete?index=${index}`)
     .then(response => { if(!response.ok) throw new Error('Delete failed'); refreshHeaterSchedule(); })
     .catch(error => { console.error('Error deleting heater schedule entry:', error); alert('Failed to delete heater schedule entry'); });
 }
@@ -847,7 +847,7 @@ function refreshSchedule(){
   editor.innerHTML='';
   scheduleEditorActions = [0,0,0,0];
   list.innerHTML = '<div class="empty-state">Loading schedule entries...</div>';
-  fetch(apiUrl('/api/schedule/list'))
+  fetch('/api/schedule/list')
     .then(response => response.json())
     .then(entries => {
       if(!Array.isArray(entries) || entries.length === 0){
@@ -875,7 +875,7 @@ function refreshSchedule(){
       }).join('');
       list.querySelectorAll('[data-edit-schedule]').forEach(btn => btn.addEventListener('click', () => {
         const index = Number(btn.getAttribute('data-edit-schedule'));
-        fetch(apiUrl(`/api/schedule/get?index=${index}`))
+        fetch(`/api/schedule/get?index=${index}`)
           .then(response => response.json())
           .then(entry => openScheduleEditor(entry))
           .catch(error => { console.error('Error fetching schedule entry:', error); alert('Error fetching schedule entry'); });
@@ -896,7 +896,7 @@ function refreshHeaterSchedule(){
   editor.innerHTML='';
   heaterScheduleEditorOpen=false;
   list.innerHTML = '<div class="empty-state">Loading heater schedule entries...</div>';
-  fetch(apiUrl('/api/heater_schedule/list'))
+  fetch('/api/heater_schedule/list')
     .then(response => response.json())
     .then(entries => {
       if(!Array.isArray(entries) || entries.length === 0){
@@ -923,7 +923,7 @@ function refreshHeaterSchedule(){
       }).join('');
       list.querySelectorAll('[data-edit-heater]').forEach(btn => btn.addEventListener('click', () => {
         const index = Number(btn.getAttribute('data-edit-heater'));
-        fetch(apiUrl(`/api/heater_schedule/get?index=${index}`))
+        fetch(`/api/heater_schedule/get?index=${index}`)
           .then(response => response.json())
           .then(entry => openHeaterScheduleEditor(entry))
           .catch(error => { console.error('Error fetching heater schedule entry:', error); alert('Error fetching heater schedule entry'); });
@@ -958,13 +958,6 @@ const API_ORIGIN = (() => {
   if (MAC && (location.protocol === 'file:' || host === 'localhost' || host === '127.0.0.1' || host.endsWith('.github.io'))) {
     return `http://piot-${MAC.toLowerCase()}.local`;
   }
-  return location.origin;
-})();
-
-function apiUrl(path) {
-  return `${API_ORIGIN}${path}`;
-}
-
 // Bake this device's MAC into the installable manifest's start_url so that
 // "Add to Home Screen" / native install (which launches whatever start_url
 // the manifest declares, NOT the URL that happened to be on screen) always
