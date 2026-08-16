@@ -79,11 +79,6 @@
   .hist-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
   .hist-controls label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
   .hist-controls .group-title{font-size:12px;color:var(--muted);font-weight:700;margin-left:4px}
-  .sysinfo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .sysinfo-item{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:10px}
-  .sysinfo-label{font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
-  .sysinfo-value{font-size:14px;color:var(--text);font-weight:700;word-break:break-word}
-  @media(max-width:760px){.sysinfo-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -111,7 +106,6 @@
         <button id="btnHeaterScheduleOpen" class="btn">Heater Schedule Settings</button>
         <button id="btnScheduleLogsOpen" class="btn">Schedule Event Logs</button>
         <button id="btnHistogramOpen" class="btn">Histogram</button>
-        <button id="btnSystemInfo" class="btn">System Information</button>
         <button id="btnInstallApp" class="btn">Add To Phone Home Screen</button>
       </div>
 
@@ -208,28 +202,6 @@
     </div>
   </div>
 
-  <div class="modal" id="system-info-modal">
-    <div class="modal-card" style="width:min(760px,100%);">
-      <div class="modal-head">
-        <div class="modal-title">System Information</div>
-        <button class="modal-close" id="system-info-modal-close" type="button">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="sysinfo-grid">
-          <div class="sysinfo-item"><div class="sysinfo-label">Unique ID</div><div class="sysinfo-value" id="sys-unique-id">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">Serial Number</div><div class="sysinfo-value" id="sys-serial-number">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">Firmware Version</div><div class="sysinfo-value" id="sys-firmware-version">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">Hardware Version</div><div class="sysinfo-value" id="sys-hardware-version">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">IP Address</div><div class="sysinfo-value" id="sys-ip-address">--</div></div>
-          <div class="sysinfo-item"><div class="sysinfo-label">MQTT Endpoint</div><div class="sysinfo-value" id="sys-mqtt-endpoint">--</div></div>
-        </div>
-        <div class="modal-actions" style="justify-content:flex-end;">
-          <button id="system-info-ok-btn" class="btn" type="button">OK</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
@@ -269,28 +241,6 @@ let latestTelemetry={
   heater:null,
   uptimeSec:null
 };
-const sysInfo = {
-  uniqueId: '--',
-  serialNumber: '--',
-  firmwareVersion: '--',
-  hardwareVersion: '--',
-  ipAddress: '--'
-};
-
-function updateSystemInfoModal(){
-  const set = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value || '--';
-  };
-  set('sys-unique-id', sysInfo.uniqueId);
-  set('sys-serial-number', sysInfo.serialNumber);
-  set('sys-firmware-version', sysInfo.firmwareVersion);
-  set('sys-hardware-version', sysInfo.hardwareVersion);
-  set('sys-ip-address', sysInfo.ipAddress);
-  set('sys-mqtt-endpoint', MQTT_URL || '--');
-}
-function showSystemInfoModal(){ updateSystemInfoModal(); openModal('system-info-modal'); }
-function hideSystemInfoModal(){ closeModal('system-info-modal'); }
 
 function histogramAlias(index1to4){
   return (circuitAliases.get(index1to4) || circuitAliases.get(index1to4 - 1) || `Circuit ${index1to4}`);
@@ -625,48 +575,42 @@ function renderCircuitSummary(actions){
   return parts.length ? parts.join(', ') : 'All circuits DC';
 }
 function showScheduleModal(){openModal('schedule-modal'); refreshSchedule();}
-function hideScheduleModal(){closeModal('schedule-modal'); hideScheduleEditor();}
+function hideScheduleModal(){closeModal('schedule-modal'); hideScheduleEditor(); scheduleModalOpen=false;}
 function showHeaterScheduleModal(){openModal('heater-schedule-modal'); refreshHeaterSchedule();}
-function hideHeaterScheduleModal(){closeModal('heater-schedule-modal'); hideHeaterScheduleEditor();}
+function hideHeaterScheduleModal(){closeModal('heater-schedule-modal'); hideHeaterScheduleEditor(); heaterScheduleModalOpen=false;}
 
+function renderScheduleLogs(){
+  const logList = document.getElementById('schedule-log-list');
+  if (!logList) return;
+  if (!Array.isArray(scheduleLogsCache) || scheduleLogsCache.length === 0) {
+    logList.innerHTML = '<div class="empty-state">No scheduled mode events in the last 24 hours.</div>';
+    return;
+  }
+  logList.innerHTML = scheduleLogsCache.map((log, idx) => `
+    <div class="schedule-item">
+      <div>
+        <div style="font-weight:800;color:var(--text);">${idx + 1}. ${escapeHtml(log.time_str || 'Unknown time')}</div>
+        <div class="meta">${escapeHtml(log.changes || 'No details')}</div>
+      </div>
+    </div>
+  `).join('');
+  logList.scrollTop = 0;
+}
 function refreshScheduleLogs(){
   const logList = document.getElementById('schedule-log-list');
   if (!logList) return;
-  logList.innerHTML = '<div class="empty-state">Loading logs...</div>';
-  fetch('/api/schedule/logs')
-    .then(response => response.json())
-    .then(logs => {
-      if (!Array.isArray(logs) || logs.length === 0) {
-        logList.innerHTML = '<div class="empty-state">No scheduled mode events in the last 24 hours.</div>';
-        return;
-      }
-      logList.innerHTML = logs.map((log, idx) => `
-        <div class="schedule-item">
-          <div>
-            <div style="font-weight:800;color:var(--text);">${idx + 1}. ${escapeHtml(log.time_str || 'Unknown time')}</div>
-            <div class="meta">${escapeHtml(log.changes || 'No details')}</div>
-          </div>
-        </div>
-      `).join('');
-      logList.scrollTop = 0;
-    })
-    .catch(error => {
-      console.error('Error loading schedule logs:', error);
-      logList.innerHTML = '<div class="empty-state">Error loading schedule logs.</div>';
-    });
+  scheduleLogModalOpen = true;
+  if (scheduleLogsCache.length === 0) {
+    logList.innerHTML = '<div class="empty-state">Loading logs...</div>';
+  } else {
+    renderScheduleLogs();
+  }
+  client?.publish(MAC+'/control/read_schedule_logs','');
 }
 
 function clearScheduleLogs(){
   if (!confirm('Clear all schedule event logs? This cannot be undone.')) return;
-  fetch('/api/schedule/logs/clear')
-    .then(response => {
-      if (!response.ok) throw new Error('Clear logs failed');
-      refreshScheduleLogs();
-    })
-    .catch(error => {
-      console.error('Error clearing schedule logs:', error);
-      alert('Failed to clear schedule logs');
-    });
+  client?.publish(MAC+'/control/clear_schedule_logs','');
 }
 
 function isIosDevice(){
@@ -833,20 +777,9 @@ function submitScheduleEntry(index){
   const actions = scheduleEditorActions.slice(0,4);
   if(!days){ alert('Please select at least one day'); return; }
   if(!actions.some(v => v !== 0)){ alert('Please set at least one circuit state'); return; }
-  const payload = { days, start_hour: hour, start_minute: minute, actions };
-  if (Number.isInteger(index)) payload.index = index;
-  fetch(index !== undefined && index !== null ? '/api/schedule/update' : '/api/schedule/add', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  }).then(response => {
-    if (!response.ok) throw new Error('Schedule save failed');
-    hideScheduleEditor();
-    refreshSchedule();
-  }).catch(error => {
-    console.error('Error saving schedule entry:', error);
-    alert('Failed to save schedule entry');
-  });
+  const payload = { index: Number.isInteger(index) ? index : -1, day: days, hour, minute, actions };
+  client?.publish(MAC+'/control/schedule_set', JSON.stringify(payload));
+  hideScheduleEditor();
 }
 function submitHeaterScheduleEntry(index){
   const days = getCheckedDayMask('heater-day-row');
@@ -861,176 +794,153 @@ function submitHeaterScheduleEntry(index){
   const stopTotal = stopHour * 60 + stopMinute;
   if(!Number.isInteger(targetHour) || !Number.isInteger(targetMinute) || !Number.isInteger(stopHour) || !Number.isInteger(stopMinute)) { alert('Invalid time values'); return; }
   if(stopTotal <= targetTotal){ alert('Hold Until must be after Ready By'); return; }
-  const payload = { days, target_temp: targetTemp, target_hour: targetHour, target_minute: targetMinute, stop_hour: stopHour, stop_minute: stopMinute };
-  if (Number.isInteger(index)) payload.index = index;
-  fetch(index !== undefined && index !== null ? '/api/heater_schedule/update' : '/api/heater_schedule/add', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  }).then(response => {
-    if (!response.ok) throw new Error('Heater schedule save failed');
-    hideHeaterScheduleEditor();
-    refreshHeaterSchedule();
-  }).catch(error => {
-    console.error('Error saving heater schedule entry:', error);
-    alert('Failed to save heater schedule entry');
-  });
+  const payload = { index: Number.isInteger(index) ? index : -1, days, target_temp: targetTemp, target_hour: targetHour, target_minute: targetMinute, stop_hour: stopHour, stop_minute: stopMinute };
+  client?.publish(MAC+'/control/heater_schedule_set', JSON.stringify(payload));
+  hideHeaterScheduleEditor();
 }
 function deleteScheduleEntry(index){
   if(!confirm('Delete this schedule entry?')) return;
-  fetch(`/api/schedule/delete?index=${index}`)
-    .then(response => { if(!response.ok) throw new Error('Delete failed'); refreshSchedule(); })
-    .catch(error => { console.error('Error deleting schedule entry:', error); alert('Failed to delete schedule entry'); });
+  client?.publish(MAC+'/control/schedule_delete', String(index));
 }
 function deleteHeaterScheduleEntry(index){
   if(!confirm('Delete this heater schedule entry?')) return;
-  fetch(`/api/heater_schedule/delete?index=${index}`)
-    .then(response => { if(!response.ok) throw new Error('Delete failed'); refreshHeaterSchedule(); })
-    .catch(error => { console.error('Error deleting heater schedule entry:', error); alert('Failed to delete heater schedule entry'); });
+  client?.publish(MAC+'/control/heater_schedule_delete', String(index));
+}
+function renderScheduleList(){
+  const list = document.getElementById('schedule-list');
+  if (!list) return;
+  const entries = [...scheduleCache.values()].sort((a,b)=> (a.hour*60+a.minute) - (b.hour*60+b.minute) || a.index-b.index);
+  if(entries.length === 0){
+    list.innerHTML = '<div class="empty-state">No schedule entries found.</div>';
+    return;
+  }
+  list.innerHTML = entries.map(entry => {
+    const dayText = dayMaskToText(entry.day ?? 0);
+    const timeText = `${String(entry.hour ?? 0).padStart(2,'0')}:${String(entry.minute ?? 0).padStart(2,'0')}`;
+    const actions = Array.isArray(entry.actions) ? entry.actions : [0,0,0,0];
+    const circuitText = actions.map((value, index) => `${getCircuitLabel(index)}: ${value === 1 ? 'ON' : value === 2 ? 'OFF' : 'DC'}`).join(', ');
+    return `
+      <div class="schedule-item">
+        <div>
+          <div style="font-weight:800;color:var(--text);">${escapeHtml(timeText)}</div>
+          <div class="meta">Days: ${escapeHtml(dayText)}</div>
+          <div class="meta">${escapeHtml(circuitText)}</div>
+        </div>
+        <div class="actions">
+          <button class="btn" type="button" data-edit-schedule="${entry.index}">Edit</button>
+          <button class="btn" type="button" data-delete-schedule="${entry.index}">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  list.querySelectorAll('[data-edit-schedule]').forEach(btn => btn.addEventListener('click', () => {
+    const index = Number(btn.getAttribute('data-edit-schedule'));
+    const entry = scheduleCache.get(index);
+    if (entry) openScheduleEditor({...entry, index});
+  }));
+  list.querySelectorAll('[data-delete-schedule]').forEach(btn => btn.addEventListener('click', () => deleteScheduleEntry(Number(btn.getAttribute('data-delete-schedule')))));
 }
 function refreshSchedule(){
   const list = document.getElementById('schedule-list');
   if (!list) return;
+  scheduleModalOpen = true;
   list.hidden = false;
   const editor = document.getElementById('schedule-editor');
   editor.classList.add('hidden');
   editor.innerHTML='';
   scheduleEditorActions = [0,0,0,0];
-  list.innerHTML = '<div class="empty-state">Loading schedule entries...</div>';
-  fetch('/api/schedule/list')
-    .then(response => response.json())
-    .then(entries => {
-      if(!Array.isArray(entries) || entries.length === 0){
-        list.innerHTML = '<div class="empty-state">No schedule entries found.</div>';
-        return;
-      }
-      list.innerHTML = entries.map(entry => {
-        const dayText = dayMaskToText(entry.days ?? entry.day ?? 0);
-        const timeText = `${String(entry.start_hour ?? entry.hour ?? 0).padStart(2,'0')}:${String(entry.start_minute ?? entry.minute ?? 0).padStart(2,'0')}`;
-        const actions = Array.isArray(entry.actions) ? entry.actions : [0,0,0,0];
-        const circuitText = actions.map((value, index) => `${getCircuitLabel(index)}: ${value === 1 ? 'ON' : value === 2 ? 'OFF' : 'DC'}`).join(', ');
-        return `
-          <div class="schedule-item">
-            <div>
-              <div style="font-weight:800;color:var(--text);">${escapeHtml(timeText)}</div>
-              <div class="meta">Days: ${escapeHtml(dayText)}</div>
-              <div class="meta">${escapeHtml(circuitText)}</div>
-            </div>
-            <div class="actions">
-              <button class="btn" type="button" data-edit-schedule="${entry.index}">Edit</button>
-              <button class="btn" type="button" data-delete-schedule="${entry.index}">Delete</button>
-            </div>
-          </div>
-        `;
-      }).join('');
-      list.querySelectorAll('[data-edit-schedule]').forEach(btn => btn.addEventListener('click', () => {
-        const index = Number(btn.getAttribute('data-edit-schedule'));
-        fetch(`/api/schedule/get?index=${index}`)
-          .then(response => response.json())
-          .then(entry => openScheduleEditor(entry))
-          .catch(error => { console.error('Error fetching schedule entry:', error); alert('Error fetching schedule entry'); });
-      }));
-      list.querySelectorAll('[data-delete-schedule]').forEach(btn => btn.addEventListener('click', () => deleteScheduleEntry(Number(btn.getAttribute('data-delete-schedule')))));
-    })
-    .catch(error => {
-      console.error('Error fetching schedule:', error);
-      list.innerHTML = '<div class="empty-state">Error loading schedule entries.</div>';
-    });
+  if (scheduleCache.size === 0) {
+    list.innerHTML = '<div class="empty-state">Loading schedule entries...</div>';
+  } else {
+    renderScheduleList();
+  }
+  client?.publish(MAC+'/control/read_schedule','');
+}
+function renderHeaterScheduleList(){
+  const list = document.getElementById('heater-schedule-list');
+  if (!list) return;
+  const entries = [...heaterScheduleCache.values()].sort((a,b)=> (a.target_hour*60+a.target_minute) - (b.target_hour*60+b.target_minute) || a.index-b.index);
+  if(entries.length === 0){
+    list.innerHTML = '<div class="empty-state">No heater schedule entries found.</div>';
+    return;
+  }
+  list.innerHTML = entries.map(entry => {
+    const dayText = dayMaskToText(entry.day ?? 0);
+    const readyBy = `${String(entry.target_hour ?? 0).padStart(2,'0')}:${String(entry.target_minute ?? 0).padStart(2,'0')}`;
+    const holdUntil = `${String(entry.stop_hour ?? 0).padStart(2,'0')}:${String(entry.stop_minute ?? 0).padStart(2,'0')}`;
+    return `
+      <div class="schedule-item" style="background:rgba(255,196,0,.08);">
+        <div>
+          <div style="font-weight:800;color:var(--text);">${escapeHtml(Number(entry.target_temp ?? 0).toFixed(1))}°F by ${escapeHtml(readyBy)}</div>
+          <div class="meta">Hold Until: ${escapeHtml(holdUntil)}</div>
+          <div class="meta">Days: ${escapeHtml(dayText)}</div>
+        </div>
+        <div class="actions">
+          <button class="btn" type="button" data-edit-heater="${entry.index}">Edit</button>
+          <button class="btn" type="button" data-delete-heater="${entry.index}">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  list.querySelectorAll('[data-edit-heater]').forEach(btn => btn.addEventListener('click', () => {
+    const index = Number(btn.getAttribute('data-edit-heater'));
+    const entry = heaterScheduleCache.get(index);
+    if (entry) openHeaterScheduleEditor({...entry, index});
+  }));
+  list.querySelectorAll('[data-delete-heater]').forEach(btn => btn.addEventListener('click', () => deleteHeaterScheduleEntry(Number(btn.getAttribute('data-delete-heater')))));
 }
 function refreshHeaterSchedule(){
   const list = document.getElementById('heater-schedule-list');
   if (!list) return;
+  heaterScheduleModalOpen = true;
   list.hidden = false;
   const editor = document.getElementById('heater-schedule-editor');
   editor.classList.add('hidden');
   editor.innerHTML='';
   heaterScheduleEditorOpen=false;
-  list.innerHTML = '<div class="empty-state">Loading heater schedule entries...</div>';
-  fetch('/api/heater_schedule/list')
-    .then(response => response.json())
-    .then(entries => {
-      if(!Array.isArray(entries) || entries.length === 0){
-        list.innerHTML = '<div class="empty-state">No heater schedule entries found.</div>';
-        return;
-      }
-      list.innerHTML = entries.map(entry => {
-        const dayText = dayMaskToText(entry.days ?? entry.day ?? 0);
-        const readyBy = `${String(entry.target_hour ?? 0).padStart(2,'0')}:${String(entry.target_minute ?? 0).padStart(2,'0')}`;
-        const holdUntil = `${String(entry.stop_hour ?? 0).padStart(2,'0')}:${String(entry.stop_minute ?? 0).padStart(2,'0')}`;
-        return `
-          <div class="schedule-item" style="background:rgba(255,196,0,.08);">
-            <div>
-              <div style="font-weight:800;color:var(--text);">${escapeHtml(Number(entry.target_temp ?? 0).toFixed(1))}°F by ${escapeHtml(readyBy)}</div>
-              <div class="meta">Hold Until: ${escapeHtml(holdUntil)}</div>
-              <div class="meta">Days: ${escapeHtml(dayText)}</div>
-            </div>
-            <div class="actions">
-              <button class="btn" type="button" data-edit-heater="${entry.index}">Edit</button>
-              <button class="btn" type="button" data-delete-heater="${entry.index}">Delete</button>
-            </div>
-          </div>
-        `;
-      }).join('');
-      list.querySelectorAll('[data-edit-heater]').forEach(btn => btn.addEventListener('click', () => {
-        const index = Number(btn.getAttribute('data-edit-heater'));
-        fetch(`/api/heater_schedule/get?index=${index}`)
-          .then(response => response.json())
-          .then(entry => openHeaterScheduleEditor(entry))
-          .catch(error => { console.error('Error fetching heater schedule entry:', error); alert('Error fetching heater schedule entry'); });
-      }));
-      list.querySelectorAll('[data-delete-heater]').forEach(btn => btn.addEventListener('click', () => deleteHeaterScheduleEntry(Number(btn.getAttribute('data-delete-heater')))));
-    })
-    .catch(error => {
-      console.error('Error fetching heater schedule:', error);
-      list.innerHTML = '<div class="empty-state">Error loading heater schedule entries.</div>';
-    });
+  if (heaterScheduleCache.size === 0) {
+    list.innerHTML = '<div class="empty-state">Loading heater schedule entries...</div>';
+  } else {
+    renderHeaterScheduleList();
+  }
+  client?.publish(MAC+'/control/read_heater_schedule','');
 }
 
 const KEY='mypool-mac';
 const DEVICE_KEY='piotDeviceId';
-function normalizeDeviceId(value){
-  return String(value || '').trim().toLowerCase().replace(/[^a-f0-9]/g, '');
-}
-function deviceFromQuery(){
+function normalizeMac(value){return String(value||'').trim().toUpperCase().replace(/[^0-9A-F]/g,'');}
+function macFromQuery(){
   const params = new URLSearchParams(window.location.search);
-  return normalizeDeviceId(params.get('device') || params.get('mac') || params.get('id') || params.get('unique_id'));
+  return normalizeMac(params.get('device') || params.get('mac') || params.get('id') || params.get('unique_id'));
 }
-let DEVICE_ID = deviceFromQuery() || normalizeDeviceId(localStorage.getItem(DEVICE_KEY)) || normalizeDeviceId(localStorage.getItem(KEY));
-if (DEVICE_ID) {
-  localStorage.setItem(DEVICE_KEY, DEVICE_ID);
-  if (localStorage.getItem(KEY) !== DEVICE_ID) {
-    localStorage.setItem(KEY, DEVICE_ID);
-  }
-  const hasDeviceInUrl = new URLSearchParams(window.location.search).has('device');
-  if (!hasDeviceInUrl) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('device', DEVICE_ID);
-    window.history.replaceState({}, '', url.toString());
-  }
-  histogramKey = `mypool-hist-${DEVICE_ID}`;
+let MAC = macFromQuery() || normalizeMac(localStorage.getItem(DEVICE_KEY)) || normalizeMac(localStorage.getItem(KEY));
+if (MAC) {
+  localStorage.setItem(KEY, MAC);
+  localStorage.setItem(DEVICE_KEY, MAC);
+  histogramKey = `mypool-hist-${MAC}`;
   loadHistogramPoints();
 } else {
   loadHistogramPoints();
 }
 
-MAC = DEVICE_ID.toUpperCase();
-sysInfo.uniqueId = MAC || '--';
-
-// Keep the PWA installable from GitHub Pages without hard-coded root paths.
+// Bake this device's MAC into the installable manifest's start_url so that
+// "Add to Home Screen" / native install (which launches whatever start_url
+// the manifest declares, NOT the URL that happened to be on screen) always
+// reopens THIS controller, even if another MyPool.AI controller was installed
+// from the same origin and left a different MAC in localStorage.
 function setDynamicManifest(mac){
   try {
     const manifest = {
       name: 'MyPool.AI',
       short_name: 'MyPool.AI',
       display: 'standalone',
-      start_url: mac ? `./?device=${encodeURIComponent(mac)}` : './',
-      scope: './',
+      start_url: mac ? `./index.html?mac=${encodeURIComponent(mac)}` : './',
       background_color: '#0b1220',
       theme_color: '#0b1220',
       icons: [
-        { src: './icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: './icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: './icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+        { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: 'icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
       ]
     };
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
@@ -1038,26 +948,18 @@ function setDynamicManifest(mac){
     if (link) link.setAttribute('href', URL.createObjectURL(blob));
   } catch (_) {}
 }
-setDynamicManifest(DEVICE_ID);
+setDynamicManifest(MAC);
 
 const MQTT_BROKER = 'pgiatis.dyndns.org';
+const MQTT_PORT = '9001';
 const MQTT_PATH = '/mqtt';
-const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}${MQTT_PATH}`;
+const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}:${MQTT_PORT}${MQTT_PATH}`;
 const MQTT_OPTS={username:'BisinaSystems',password:'BisinaSystems123',reconnectPeriod:0};
 let client=null;let reconnectTimer=null;
 const circuitAliases=new Map();const aliasGroups=new Map();const circuitPower=new Map();const circuitStatus=new Map();
 let aiMode=0;let aiHeatRate='--';let aiRateInterp=0;
-
-function mqttDiagSnapshot(stage, detail=''){
-  const queryDevice = new URLSearchParams(window.location.search).get('device') || '';
-  const savedDevice = localStorage.getItem(DEVICE_KEY) || '';
-  const finalDevice = MAC || '';
-  const msg = `[MQTT-DIAG] ${stage} | url=${window.location.href} | query.device=${queryDevice} | saved.${DEVICE_KEY}=${savedDevice} | finalDevice=${finalDevice} | mqttUrl=${MQTT_URL}${detail ? ` | ${detail}` : ''}`;
-  console.log(msg);
-  setFoot(`Diag ${stage} | q=${queryDevice || '-'} | saved=${savedDevice || '-'} | final=${finalDevice || '-'} | ${MQTT_URL}${detail ? ` | ${detail}` : ''}`);
-}
-
-mqttDiagSnapshot('bootstrap');
+const scheduleCache=new Map();const heaterScheduleCache=new Map();let scheduleLogsCache=[];
+let scheduleModalOpen=false;let heaterScheduleModalOpen=false;let scheduleLogModalOpen=false;
 
 function updateFooterStatus(extra){
   const modeLabel = modeName(modeState);
@@ -1149,22 +1051,6 @@ function onMsg(topic,payloadBuf){
     aiRateInterp=parseInt(payload)||0;
     if(client && client.connected){updateFooterStatus();}
   }
-  else if(topic.endsWith('/sensors/firmware_version')){
-    sysInfo.firmwareVersion = payload || '--';
-    updateSystemInfoModal();
-  }
-  else if(topic.endsWith('/sensors/hardware_version')){
-    sysInfo.hardwareVersion = payload || '--';
-    updateSystemInfoModal();
-  }
-  else if(topic.endsWith('/sensors/serial_number')){
-    sysInfo.serialNumber = payload || '--';
-    updateSystemInfoModal();
-  }
-  else if(topic.endsWith('/sensors/ip_address')){
-    sysInfo.ipAddress = payload || '--';
-    updateSystemInfoModal();
-  }
   else if(/\/sensors\/circuit_(\d+)_alias$/.test(topic)){
     const m=topic.match(/circuit_(\d+)_alias$/);const idx=Number(m[1]);
     circuitAliases.set(idx,payload.trim());recomputeGroups();
@@ -1185,16 +1071,31 @@ function onMsg(topic,payloadBuf){
       if(before!==grp.anyOn)updateButton(alias);
     }
   }
+  else if(/\/schedule\/(\d+)$/.test(topic)){
+    const idx=Number(topic.match(/\/schedule\/(\d+)$/)[1]);
+    let entry=null;
+    try{ entry=JSON.parse(payload); }catch(_){ entry=null; }
+    if(entry && entry.day){ scheduleCache.set(idx,{...entry,index:idx}); }
+    else { scheduleCache.delete(idx); }
+    if(scheduleModalOpen) renderScheduleList();
+  }
+  else if(/\/heater_schedule\/(\d+)$/.test(topic)){
+    const idx=Number(topic.match(/\/heater_schedule\/(\d+)$/)[1]);
+    let entry=null;
+    try{ entry=JSON.parse(payload); }catch(_){ entry=null; }
+    if(entry && entry.day){ heaterScheduleCache.set(idx,{...entry,index:idx}); }
+    else { heaterScheduleCache.delete(idx); }
+    if(heaterScheduleModalOpen) renderHeaterScheduleList();
+  }
+  else if(topic.endsWith('/schedule_logs')){
+    try{ scheduleLogsCache=JSON.parse(payload)||[]; }catch(_){ scheduleLogsCache=[]; }
+    if(scheduleLogModalOpen) renderScheduleLogs();
+  }
 }
 function connect(){
-  if(!MAC){
-    mqttDiagSnapshot('connect_skipped', 'No device id provided');
-    setFoot('No device id provided. Use the embedded install link.');
-    return;
-  }
+  if(!MAC){setFoot('No device id provided. Use the embedded install link.');return;}
   if(client){client.end(true);client=null;}
-  setDot('#ffb84d');
-  mqttDiagSnapshot('connect_start');
+  setDot('#ffb84d');setFoot('Connecting…');
   try{
     client=mqtt.connect(MQTT_URL,MQTT_OPTS);
     client.on('connect',()=>{
@@ -1202,7 +1103,6 @@ function connect(){
       hasConnectedOnce = true;
       setDot('#2cd186');
       updateFooterStatus('syncing...');
-      mqttDiagSnapshot('event_connect');
       client.subscribe(MAC+'/#');
       client.publish(MAC+'/control/read_alias','');
       client.publish(MAC+'/control/read_circuit_status','');
@@ -1212,41 +1112,27 @@ function connect(){
       fetchUptimeAndDetectReboot();
     });
     client.on('message',onMsg);
-    client.on('reconnect',()=>{mqttDiagSnapshot('event_reconnect');});
-    client.on('close',()=>{addHistogramEvent('Disconnected');setDot('#7a8699');mqttDiagSnapshot('event_close');scheduleReconnect();});
-    client.on('offline',()=>{setDot('#7a8699');mqttDiagSnapshot('event_offline');});
-    client.on('error',e=>{setDot('#ff6b6b');mqttDiagSnapshot('event_error', e?.message || 'unknown');client.end(true);scheduleReconnect();});
-  }catch(e){setDot('#ff6b6b');mqttDiagSnapshot('connect_exception', e.message);scheduleReconnect();}
+    client.on('close',()=>{addHistogramEvent('Disconnected');setDot('#7a8699');setFoot('Disconnected');scheduleReconnect();});
+    client.on('error',e=>{setDot('#ff6b6b');setFoot('Error: '+(e?.message||'unknown'));client.end(true);scheduleReconnect();});
+  }catch(e){setDot('#ff6b6b');setFoot('Connect exception: '+e.message);scheduleReconnect();}
 }
-function scheduleReconnect(){
-  if(reconnectTimer) return;
-  mqttDiagSnapshot('reconnect_scheduled', 'in 5000ms');
-  reconnectTimer=setTimeout(()=>{
-    reconnectTimer=null;
-    mqttDiagSnapshot('reconnect_timer_fired');
-    connect();
-  },5000);
-}
+function scheduleReconnect(){if(reconnectTimer)return;reconnectTimer=setTimeout(()=>{reconnectTimer=null;connect();},5000);}
 
 $('#btnScheduleOpen').onclick = showScheduleModal;
 $('#btnHeaterScheduleOpen').onclick = showHeaterScheduleModal;
 document.getElementById('btnScheduleLogsOpen').onclick = showScheduleLogModal;
 $('#btnHistogramOpen').onclick = showHistogramModal;
-document.getElementById('btnSystemInfo').onclick = showSystemInfoModal;
 document.getElementById('btnInstallApp').onclick = installApp;
 document.getElementById('schedule-modal-close').onclick = hideScheduleModal;
 document.getElementById('heater-schedule-modal-close').onclick = hideHeaterScheduleModal;
 document.getElementById('histogram-modal-close').onclick = hideHistogramModal;
 document.getElementById('schedule-log-modal-close').onclick = hideScheduleLogModal;
 document.getElementById('install-help-modal-close').onclick = () => closeModal('install-help-modal');
-document.getElementById('system-info-modal-close').onclick = hideSystemInfoModal;
-document.getElementById('system-info-ok-btn').onclick = hideSystemInfoModal;
 document.getElementById('schedule-modal').addEventListener('click', e => { if (e.target.id === 'schedule-modal') hideScheduleModal(); });
 document.getElementById('heater-schedule-modal').addEventListener('click', e => { if (e.target.id === 'heater-schedule-modal') hideHeaterScheduleModal(); });
 document.getElementById('histogram-modal').addEventListener('click', e => { if (e.target.id === 'histogram-modal') hideHistogramModal(); });
 document.getElementById('schedule-log-modal').addEventListener('click', e => { if (e.target.id === 'schedule-log-modal') hideScheduleLogModal(); });
 document.getElementById('install-help-modal').addEventListener('click', e => { if (e.target.id === 'install-help-modal') closeModal('install-help-modal'); });
-document.getElementById('system-info-modal').addEventListener('click', e => { if (e.target.id === 'system-info-modal') hideSystemInfoModal(); });
 document.getElementById('schedule-add-btn').onclick = () => { openScheduleEditor(null); };
 document.getElementById('schedule-refresh-btn').onclick = refreshSchedule;
 document.getElementById('heater-schedule-add-btn').onclick = () => { openHeaterScheduleEditor(null); };
@@ -1275,7 +1161,7 @@ setInterval(() => { sampleHistogram(false); }, HISTOGRAM_SAMPLE_MS);
 $('#btnUp').onclick=()=>{setTemp++;$('#valSet').textContent=setTemp.toFixed(1)+'°F';client?.publish(`${MAC}/control/set_temperature`,String(setTemp));};
 $('#btnDown').onclick=()=>{setTemp--;$('#valSet').textContent=setTemp.toFixed(1)+'°F';client?.publish(`${MAC}/control/set_temperature`,String(setTemp));};
 $('#valMode').onclick=()=>{modeState=(modeState+1)%4;$('#valMode').textContent=modeName(modeState);client?.publish(`${MAC}/control/set_mode`,String(modeState));};
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('service-worker.js').catch(()=>{});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('service-worker-fixed.js').catch(()=>{});});}
 </script>
 </body>
 </html>
