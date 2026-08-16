@@ -79,6 +79,11 @@
   .hist-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
   .hist-controls label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
   .hist-controls .group-title{font-size:12px;color:var(--muted);font-weight:700;margin-left:4px}
+  .sysinfo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .sysinfo-item{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:10px}
+  .sysinfo-label{font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+  .sysinfo-value{font-size:14px;color:var(--text);font-weight:700;word-break:break-word}
+  @media(max-width:760px){.sysinfo-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -106,6 +111,7 @@
         <button id="btnHeaterScheduleOpen" class="btn">Heater Schedule Settings</button>
         <button id="btnScheduleLogsOpen" class="btn">Schedule Event Logs</button>
         <button id="btnHistogramOpen" class="btn">Histogram</button>
+        <button id="btnSystemInfo" class="btn">System Information</button>
         <button id="btnInstallApp" class="btn">Add To Phone Home Screen</button>
       </div>
 
@@ -202,6 +208,28 @@
     </div>
   </div>
 
+  <div class="modal" id="system-info-modal">
+    <div class="modal-card" style="width:min(760px,100%);">
+      <div class="modal-head">
+        <div class="modal-title">System Information</div>
+        <button class="modal-close" id="system-info-modal-close" type="button">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="sysinfo-grid">
+          <div class="sysinfo-item"><div class="sysinfo-label">Unique ID</div><div class="sysinfo-value" id="sys-unique-id">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">Serial Number</div><div class="sysinfo-value" id="sys-serial-number">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">Firmware Version</div><div class="sysinfo-value" id="sys-firmware-version">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">Hardware Version</div><div class="sysinfo-value" id="sys-hardware-version">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">IP Address</div><div class="sysinfo-value" id="sys-ip-address">--</div></div>
+          <div class="sysinfo-item"><div class="sysinfo-label">MQTT Endpoint</div><div class="sysinfo-value" id="sys-mqtt-endpoint">--</div></div>
+        </div>
+        <div class="modal-actions" style="justify-content:flex-end;">
+          <button id="system-info-ok-btn" class="btn" type="button">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
@@ -241,6 +269,28 @@ let latestTelemetry={
   heater:null,
   uptimeSec:null
 };
+const sysInfo = {
+  uniqueId: '--',
+  serialNumber: '--',
+  firmwareVersion: '--',
+  hardwareVersion: '--',
+  ipAddress: '--'
+};
+
+function updateSystemInfoModal(){
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value || '--';
+  };
+  set('sys-unique-id', sysInfo.uniqueId);
+  set('sys-serial-number', sysInfo.serialNumber);
+  set('sys-firmware-version', sysInfo.firmwareVersion);
+  set('sys-hardware-version', sysInfo.hardwareVersion);
+  set('sys-ip-address', sysInfo.ipAddress);
+  set('sys-mqtt-endpoint', MQTT_URL || '--');
+}
+function showSystemInfoModal(){ updateSystemInfoModal(); openModal('system-info-modal'); }
+function hideSystemInfoModal(){ closeModal('system-info-modal'); }
 
 function histogramAlias(index1to4){
   return (circuitAliases.get(index1to4) || circuitAliases.get(index1to4 - 1) || `Circuit ${index1to4}`);
@@ -938,39 +988,49 @@ function refreshHeaterSchedule(){
 
 const KEY='mypool-mac';
 const DEVICE_KEY='piotDeviceId';
-function normalizeMac(value){return String(value||'').trim().toUpperCase().replace(/[^0-9A-F]/g,'');}
-function macFromQuery(){
-  const params = new URLSearchParams(window.location.search);
-  return normalizeMac(params.get('device') || params.get('mac') || params.get('id') || params.get('unique_id'));
+function normalizeDeviceId(value){
+  return String(value || '').trim().toLowerCase().replace(/[^a-f0-9]/g, '');
 }
-let MAC = macFromQuery() || normalizeMac(localStorage.getItem(DEVICE_KEY)) || normalizeMac(localStorage.getItem(KEY));
-if (MAC) {
-  localStorage.setItem(KEY, MAC);
-  localStorage.setItem(DEVICE_KEY, MAC);
-  histogramKey = `mypool-hist-${MAC}`;
+function deviceFromQuery(){
+  const params = new URLSearchParams(window.location.search);
+  return normalizeDeviceId(params.get('device') || params.get('mac') || params.get('id') || params.get('unique_id'));
+}
+let DEVICE_ID = deviceFromQuery() || normalizeDeviceId(localStorage.getItem(DEVICE_KEY)) || normalizeDeviceId(localStorage.getItem(KEY));
+if (DEVICE_ID) {
+  localStorage.setItem(DEVICE_KEY, DEVICE_ID);
+  if (localStorage.getItem(KEY) !== DEVICE_ID) {
+    localStorage.setItem(KEY, DEVICE_ID);
+  }
+  const hasDeviceInUrl = new URLSearchParams(window.location.search).has('device');
+  if (!hasDeviceInUrl) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('device', DEVICE_ID);
+    window.history.replaceState({}, '', url.toString());
+  }
+  histogramKey = `mypool-hist-${DEVICE_ID}`;
   loadHistogramPoints();
 } else {
   loadHistogramPoints();
 }
 
-// Bake this device's MAC into the installable manifest's start_url so that
-// "Add to Home Screen" / native install (which launches whatever start_url
-// the manifest declares, NOT the URL that happened to be on screen) always
-// reopens THIS controller, even if another MyPool.AI controller was installed
-// from the same origin and left a different MAC in localStorage.
+MAC = DEVICE_ID.toUpperCase();
+sysInfo.uniqueId = MAC || '--';
+
+// Keep the PWA installable from GitHub Pages without hard-coded root paths.
 function setDynamicManifest(mac){
   try {
     const manifest = {
       name: 'MyPool.AI',
       short_name: 'MyPool.AI',
       display: 'standalone',
-      start_url: mac ? `./index.html?mac=${encodeURIComponent(mac)}` : './',
+      start_url: mac ? `./?device=${encodeURIComponent(mac)}` : './',
+      scope: './',
       background_color: '#0b1220',
       theme_color: '#0b1220',
       icons: [
-        { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: 'icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+        { src: './icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: './icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: './icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
       ]
     };
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
@@ -978,16 +1038,26 @@ function setDynamicManifest(mac){
     if (link) link.setAttribute('href', URL.createObjectURL(blob));
   } catch (_) {}
 }
-setDynamicManifest(MAC);
+setDynamicManifest(DEVICE_ID);
 
 const MQTT_BROKER = 'pgiatis.dyndns.org';
-const MQTT_PORT = '9001';
 const MQTT_PATH = '/mqtt';
-const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}:${MQTT_PORT}${MQTT_PATH}`;
+const MQTT_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + `${MQTT_BROKER}${MQTT_PATH}`;
 const MQTT_OPTS={username:'BisinaSystems',password:'BisinaSystems123',reconnectPeriod:0};
 let client=null;let reconnectTimer=null;
 const circuitAliases=new Map();const aliasGroups=new Map();const circuitPower=new Map();const circuitStatus=new Map();
 let aiMode=0;let aiHeatRate='--';let aiRateInterp=0;
+
+function mqttDiagSnapshot(stage, detail=''){
+  const queryDevice = new URLSearchParams(window.location.search).get('device') || '';
+  const savedDevice = localStorage.getItem(DEVICE_KEY) || '';
+  const finalDevice = MAC || '';
+  const msg = `[MQTT-DIAG] ${stage} | url=${window.location.href} | query.device=${queryDevice} | saved.${DEVICE_KEY}=${savedDevice} | finalDevice=${finalDevice} | mqttUrl=${MQTT_URL}${detail ? ` | ${detail}` : ''}`;
+  console.log(msg);
+  setFoot(`Diag ${stage} | q=${queryDevice || '-'} | saved=${savedDevice || '-'} | final=${finalDevice || '-'} | ${MQTT_URL}${detail ? ` | ${detail}` : ''}`);
+}
+
+mqttDiagSnapshot('bootstrap');
 
 function updateFooterStatus(extra){
   const modeLabel = modeName(modeState);
@@ -1079,6 +1149,22 @@ function onMsg(topic,payloadBuf){
     aiRateInterp=parseInt(payload)||0;
     if(client && client.connected){updateFooterStatus();}
   }
+  else if(topic.endsWith('/sensors/firmware_version')){
+    sysInfo.firmwareVersion = payload || '--';
+    updateSystemInfoModal();
+  }
+  else if(topic.endsWith('/sensors/hardware_version')){
+    sysInfo.hardwareVersion = payload || '--';
+    updateSystemInfoModal();
+  }
+  else if(topic.endsWith('/sensors/serial_number')){
+    sysInfo.serialNumber = payload || '--';
+    updateSystemInfoModal();
+  }
+  else if(topic.endsWith('/sensors/ip_address')){
+    sysInfo.ipAddress = payload || '--';
+    updateSystemInfoModal();
+  }
   else if(/\/sensors\/circuit_(\d+)_alias$/.test(topic)){
     const m=topic.match(/circuit_(\d+)_alias$/);const idx=Number(m[1]);
     circuitAliases.set(idx,payload.trim());recomputeGroups();
@@ -1101,9 +1187,14 @@ function onMsg(topic,payloadBuf){
   }
 }
 function connect(){
-  if(!MAC){setFoot('No device id provided. Use the embedded install link.');return;}
+  if(!MAC){
+    mqttDiagSnapshot('connect_skipped', 'No device id provided');
+    setFoot('No device id provided. Use the embedded install link.');
+    return;
+  }
   if(client){client.end(true);client=null;}
-  setDot('#ffb84d');setFoot('Connecting…');
+  setDot('#ffb84d');
+  mqttDiagSnapshot('connect_start');
   try{
     client=mqtt.connect(MQTT_URL,MQTT_OPTS);
     client.on('connect',()=>{
@@ -1111,6 +1202,7 @@ function connect(){
       hasConnectedOnce = true;
       setDot('#2cd186');
       updateFooterStatus('syncing...');
+      mqttDiagSnapshot('event_connect');
       client.subscribe(MAC+'/#');
       client.publish(MAC+'/control/read_alias','');
       client.publish(MAC+'/control/read_circuit_status','');
@@ -1120,27 +1212,41 @@ function connect(){
       fetchUptimeAndDetectReboot();
     });
     client.on('message',onMsg);
-    client.on('close',()=>{addHistogramEvent('Disconnected');setDot('#7a8699');setFoot('Disconnected');scheduleReconnect();});
-    client.on('error',e=>{setDot('#ff6b6b');setFoot('Error: '+(e?.message||'unknown'));client.end(true);scheduleReconnect();});
-  }catch(e){setDot('#ff6b6b');setFoot('Connect exception: '+e.message);scheduleReconnect();}
+    client.on('reconnect',()=>{mqttDiagSnapshot('event_reconnect');});
+    client.on('close',()=>{addHistogramEvent('Disconnected');setDot('#7a8699');mqttDiagSnapshot('event_close');scheduleReconnect();});
+    client.on('offline',()=>{setDot('#7a8699');mqttDiagSnapshot('event_offline');});
+    client.on('error',e=>{setDot('#ff6b6b');mqttDiagSnapshot('event_error', e?.message || 'unknown');client.end(true);scheduleReconnect();});
+  }catch(e){setDot('#ff6b6b');mqttDiagSnapshot('connect_exception', e.message);scheduleReconnect();}
 }
-function scheduleReconnect(){if(reconnectTimer)return;reconnectTimer=setTimeout(()=>{reconnectTimer=null;connect();},5000);}
+function scheduleReconnect(){
+  if(reconnectTimer) return;
+  mqttDiagSnapshot('reconnect_scheduled', 'in 5000ms');
+  reconnectTimer=setTimeout(()=>{
+    reconnectTimer=null;
+    mqttDiagSnapshot('reconnect_timer_fired');
+    connect();
+  },5000);
+}
 
 $('#btnScheduleOpen').onclick = showScheduleModal;
 $('#btnHeaterScheduleOpen').onclick = showHeaterScheduleModal;
 document.getElementById('btnScheduleLogsOpen').onclick = showScheduleLogModal;
 $('#btnHistogramOpen').onclick = showHistogramModal;
+document.getElementById('btnSystemInfo').onclick = showSystemInfoModal;
 document.getElementById('btnInstallApp').onclick = installApp;
 document.getElementById('schedule-modal-close').onclick = hideScheduleModal;
 document.getElementById('heater-schedule-modal-close').onclick = hideHeaterScheduleModal;
 document.getElementById('histogram-modal-close').onclick = hideHistogramModal;
 document.getElementById('schedule-log-modal-close').onclick = hideScheduleLogModal;
 document.getElementById('install-help-modal-close').onclick = () => closeModal('install-help-modal');
+document.getElementById('system-info-modal-close').onclick = hideSystemInfoModal;
+document.getElementById('system-info-ok-btn').onclick = hideSystemInfoModal;
 document.getElementById('schedule-modal').addEventListener('click', e => { if (e.target.id === 'schedule-modal') hideScheduleModal(); });
 document.getElementById('heater-schedule-modal').addEventListener('click', e => { if (e.target.id === 'heater-schedule-modal') hideHeaterScheduleModal(); });
 document.getElementById('histogram-modal').addEventListener('click', e => { if (e.target.id === 'histogram-modal') hideHistogramModal(); });
 document.getElementById('schedule-log-modal').addEventListener('click', e => { if (e.target.id === 'schedule-log-modal') hideScheduleLogModal(); });
 document.getElementById('install-help-modal').addEventListener('click', e => { if (e.target.id === 'install-help-modal') closeModal('install-help-modal'); });
+document.getElementById('system-info-modal').addEventListener('click', e => { if (e.target.id === 'system-info-modal') hideSystemInfoModal(); });
 document.getElementById('schedule-add-btn').onclick = () => { openScheduleEditor(null); };
 document.getElementById('schedule-refresh-btn').onclick = refreshSchedule;
 document.getElementById('heater-schedule-add-btn').onclick = () => { openHeaterScheduleEditor(null); };
@@ -1169,7 +1275,7 @@ setInterval(() => { sampleHistogram(false); }, HISTOGRAM_SAMPLE_MS);
 $('#btnUp').onclick=()=>{setTemp++;$('#valSet').textContent=setTemp.toFixed(1)+'°F';client?.publish(`${MAC}/control/set_temperature`,String(setTemp));};
 $('#btnDown').onclick=()=>{setTemp--;$('#valSet').textContent=setTemp.toFixed(1)+'°F';client?.publish(`${MAC}/control/set_temperature`,String(setTemp));};
 $('#valMode').onclick=()=>{modeState=(modeState+1)%4;$('#valMode').textContent=modeName(modeState);client?.publish(`${MAC}/control/set_mode`,String(modeState));};
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('service-worker-fixed.js').catch(()=>{});});}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('service-worker.js').catch(()=>{});});}
 </script>
 </body>
 </html>
