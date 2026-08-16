@@ -1,4 +1,4 @@
-const CACHE = 'mypool-v16';
+const CACHE = 'mypool-v17';
 const ASSETS = [
   'index.html',
   'mypool.html',

@@ -1,13 +1,8 @@
-const CACHE = 'mypool-github-pages-v2';
+const CACHE = 'mypool-v9';
 const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './service-worker.js',
-  './mqttws31.min.js',
-  './icon-192.png',
-  './icon-512.png',
-  './icon-512-maskable.png'
+  'mypool.html',
+  'mqttws31.min.js',
+  'manifest_fixed.json'
 ];
 
 self.addEventListener('install', e => {
