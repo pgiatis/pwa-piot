@@ -1,4 +1,4 @@
-const CACHE = 'mypool-v9';
+const CACHE = 'mypool-v8';
 const ASSETS = [
   'mypool.html',
   'mqttws31.min.js',
