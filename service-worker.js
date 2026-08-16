@@ -1,4 +1,4 @@
-const CACHE = 'mypool-github-pages-v2';
+const CACHE = 'mypool-github-pages-v3';
 const ASSETS = [
   './',
   './index.html',
