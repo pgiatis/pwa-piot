@@ -83,6 +83,8 @@
   .sysinfo-item{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:10px}
   .sysinfo-label{font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
   .sysinfo-value{font-size:14px;color:var(--text);font-weight:700;word-break:break-word}
+  .sysinfo-link{color:#8fc8ff;text-decoration:underline}
+  .sysinfo-link:hover{color:#b9ddff}
   @media(max-width:760px){.sysinfo-grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -277,6 +279,40 @@ const sysInfo = {
   ipAddress: '--'
 };
 
+function buildSystemInfoIpUrl(rawIp){
+  const trimmed = String(rawIp || '').trim();
+  if (!trimmed || trimmed === '--') return null;
+  let candidate = trimmed;
+  if (!/^https?:\/\//i.test(candidate)) candidate = `http://${candidate}`;
+  try {
+    const url = new URL(candidate);
+    if (!url.hostname) return null;
+    return url.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
+function renderSystemInfoIp(){
+  const el = document.getElementById('sys-ip-address');
+  if (!el) return;
+  const raw = sysInfo.ipAddress || '--';
+  const url = buildSystemInfoIpUrl(raw);
+  el.textContent = '';
+  if (!url) {
+    el.textContent = raw;
+    return;
+  }
+  const link = document.createElement('a');
+  link.className = 'sysinfo-link';
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = raw;
+  link.title = 'Open embedded web server';
+  el.appendChild(link);
+}
+
 function updateSystemInfoModal(){
   const set = (id, value) => {
     const el = document.getElementById(id);
@@ -286,7 +322,7 @@ function updateSystemInfoModal(){
   set('sys-serial-number', sysInfo.serialNumber);
   set('sys-firmware-version', sysInfo.firmwareVersion);
   set('sys-hardware-version', sysInfo.hardwareVersion);
-  set('sys-ip-address', sysInfo.ipAddress);
+  renderSystemInfoIp();
   set('sys-mqtt-endpoint', MQTT_URL || '--');
 }
 function showSystemInfoModal(){ updateSystemInfoModal(); openModal('system-info-modal'); }
